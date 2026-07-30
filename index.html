@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;600;700;800&display=swap" rel="stylesheet">
 <script>/* force fresh load when version changes */
-(function(){var v='v21';if(sessionStorage.getItem('cro-ver')!==v){sessionStorage.setItem('cro-ver',v);if(window.location.href.indexOf('nocache')<0){window.location.replace(window.location.href+(window.location.href.indexOf('?')>=0?'&':'?')+'nocache='+v);}}})();
+(function(){var v='v22';if(sessionStorage.getItem('cro-ver')!==v){sessionStorage.setItem('cro-ver',v);if(window.location.href.indexOf('nocache')<0){window.location.replace(window.location.href+(window.location.href.indexOf('?')>=0?'&':'?')+'nocache='+v);}}})();
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
@@ -393,32 +393,41 @@ function extractTechBlock(html,url){
 }
 
 function detectSubpages(text,base){
-  var targets=[
-    {re:/\/(aanbod|woningen|beschikbaar|appartementen|studio|loft|woning-?type|bouwnummer|unit)/i,  label:'AANBODPAGINA',  jina:true},
-    {re:/\/(contact|contactgegevens|bereikbaar)/i,                                                  label:'CONTACTPAGINA', jina:false},
-    {re:/\/(faq|veelgestelde-vragen|vragen)/i,                                                      label:'FAQ',           jina:false},
-    {re:/\/(downloads?|brochure)/i,                                                                 label:'DOWNLOADS',     jina:false},
-    {re:/\/(locatie|omgeving|buurt|ligging)/i,                                                      label:'LOCATIE',       jina:true},
-    {re:/\/(sfeer|impressie|sfeerbeelden|gallery|galerij)/i,                                        label:'SFEERBEELDEN',  jina:false},
-    {re:/\/(duurzaamheid|energie|milieu|groen)/i,                                                   label:'DUURZAAMHEID',  jina:false},
-    {re:/\/(over|over-ons|over-het-project|ontwikkelaar)/i,                                         label:'OVER',          jina:false},
-    {re:/\/(plattegronden?|floor-?plan)/i,                                                          label:'PLATTEGRONDEN', jina:true},
+  var LMAP=[
+    [/\/(aanbod|woningen|beschikbaar|appartementen|bouwnummer|units?)/i,'AANBOD'],
+    [/\/plattegrond/i,'PLATTEGRONDEN'],
+    [/\/contact/i,'CONTACT'],
+    [/\/(faq|vragen)/i,'FAQ'],
+    [/\/(downloads?|brochure)/i,'DOWNLOADS'],
+    [/\/(locatie|omgeving|buurt|ligging)/i,'LOCATIE'],
+    [/\/(sfeer|impressie|gallery|galerij|beelden)/i,'SFEER'],
+    [/\/(duurzaamheid|energie|groen)/i,'DUURZAAMHEID'],
+    [/\/(over[-/]|het-project|project-info|ontwikkelaar)/i,'OVER'],
+    [/\/(nieuws|blog|update|actueel)/i,'NIEUWS'],
   ];
-  var found={},result=[];
-  var hrefs=[];
-  text.replace(/\[([^\]]*)\]\((https?:\/\/[^)]+|\/[^)]+)\)/g,function(_,t,h){hrefs.push(h);});
+  var SKIP_EXT=/\.(pdf|jpg|jpeg|png|gif|svg|css|js|ico|woff2?|mp4|zip|xml)($|\?)/i;
+  var SKIP_PATH=/\/(login|logout|admin|wp-admin|wp-json|sitemap|feed|rss|cart|checkout|zoeken|search|404|privacy|cookie|disclaimer)/i;
+  var seen=new Set([base,base+'/',base+'/index.html',base+'/index']);
+  var hrefs=[],result=[];
+  text.replace(/\[([^\]]*)\]\((https?:[^)\s]+|\/[^)\s]+)\)/g,function(_,t,h){hrefs.push(h);});
   text.replace(/href=["']([^"']+)["']/gi,function(_,h){hrefs.push(h);});
   hrefs.forEach(function(h){
-    targets.forEach(function(t){
-      if(found[t.label]) return;
-      if(t.re.test(h)){
-        found[t.label]=true;
-        var full=h.startsWith('http')?h:(h.startsWith('/')?base+h:base+'/'+h);
-        result.push({url:full,label:t.label,jina:t.jina});
-      }
-    });
+    if(SKIP_EXT.test(h)||SKIP_PATH.test(h)) return;
+    if(/^(mailto:|tel:|javascript:|#)/i.test(h)) return;
+    var full=h.startsWith('http')?h:(h.startsWith('/')?base+h:null);
+    if(!full||!full.startsWith(base)) return;
+    var key=full.split('?')[0].split('#')[0].replace(/\/$/,'');
+    if(seen.has(key)||seen.has(key+'/')) return;
+    seen.add(key);
+    var lbl='';
+    LMAP.forEach(function(m){if(!lbl&&m[0].test(key)) lbl=m[1];});
+    if(!lbl){
+      var seg=key.replace(base,'').replace(/^\//,'').split('/')[0];
+      lbl=seg.toUpperCase().replace(/-/g,' ').substring(0,18)||'PAGINA';
+    }
+    result.push({url:key,label:lbl,jina:true});
   });
-  return result;
+  return result.slice(0,8);
 }
 
 async function fetchPageContent(url){
