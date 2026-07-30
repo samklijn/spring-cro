@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;600;700;800&display=swap" rel="stylesheet">
 <script>/* force fresh load when version changes */
-(function(){var v='v9';if(sessionStorage.getItem('cro-ver')!==v){sessionStorage.setItem('cro-ver',v);if(window.location.href.indexOf('nocache')<0){window.location.replace(window.location.href+(window.location.href.indexOf('?')>=0?'&':'?')+'nocache='+v);}}})();
+(function(){var v='v10';if(sessionStorage.getItem('cro-ver')!==v){sessionStorage.setItem('cro-ver',v);if(window.location.href.indexOf('nocache')<0){window.location.replace(window.location.href+(window.location.href.indexOf('?')>=0?'&':'?')+'nocache='+v);}}})();
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <style>
@@ -320,37 +320,48 @@ async function doScan(){
 }
 
 function buildPrompt(url){
-  return 'Je bent een CRO-expert die Nederlandse nieuwbouw projectwebsites beoordeelt. Analyseer de onderstaande URL op basis van je kennis van de site, het domein en gangbare nieuwbouw projectwebsites.\n\nURL: '+url+'\n\nBeoordeel op 10 dimensies. Wees kritisch en realistisch — de meeste sites scoren 40-65. Geef concrete, uitvoerbare verbeterpunten in het Nederlands.\n\nGeef ALLEEN deze JSON (geen andere tekst):\n{"total":<0-100>,"dimensions":[{"name":"Hero & waardepropositie","score":<0-10>,"max":10,"feedback":["concreet punt","concreet punt"]},{"name":"Conversie & CTA\'s","score":<0-20>,"max":20,"feedback":["concreet punt","concreet punt"]},{"name":"Aanbod & beschikbaarheid","score":<0-15>,"max":15,"feedback":["concreet punt","concreet punt"]},{"name":"Plattegronden","score":<0-10>,"max":10,"feedback":["concreet punt","concreet punt"]},{"name":"Omgeving & storytelling","score":<0-10>,"max":10,"feedback":["concreet punt","concreet punt"]},{"name":"Duurzaamheid & kwaliteit","score":<0-5>,"max":5,"feedback":["concreet punt","concreet punt"]},{"name":"Vertrouwen & bewijs","score":<0-5>,"max":5,"feedback":["concreet punt","concreet punt"]},{"name":"Communicatiescan","score":<0-10>,"max":10,"feedback":["concreet punt","concreet punt"]},{"name":"Beeld & beleving","score":<0-5>,"max":5,"feedback":["concreet punt","concreet punt"]},{"name":"Techniek & marketing","score":<0-10>,"max":10,"feedback":["concreet punt","concreet punt"]}],"opener":"gespreksopener van 2-3 zinnen voor een makelaar om mee het gesprek aan te gaan"}';
+  return 'Je bent een CRO-expert voor Nederlandse nieuwbouw projectwebsites. Analyseer de URL op basis van jouw kennis van het domein en gangbare nieuwbouw projectwebsites. Wees kritisch en realistisch.\n\nURL: '+url+'\n\nBeoordeel 10 categorieën. Scoringsregel per vraag: Ja=2pt, Gedeeltelijk=1pt, Nee=0pt. Categoriescore = (behaalde punten ÷ max punten) × weging. Rond af op 1 decimaal.\n\n1. Hero & Eerste indruk (weging 10, 5 vragen, max raw 10): projectnaam direct zichtbaar, locatie direct zichtbaar, concept duidelijk binnen 5s, minimaal 2 USP\'s zichtbaar, primaire CTA boven de vouw.\n2. Navigatie & Gebruiksvriendelijkheid (weging 15, 5 vragen, max raw 10): logisch hoofdmenu, alle pagina\'s bereikbaar, mobiel bruikbaar, woning bereikbaar in <3 klikken, CTA\'s consistent zichtbaar.\n3. Woninginformatie & Beschikbaarheid (weging 20, 8 vragen, max raw 16): woningzoeker aanwezig, plattegronden beschikbaar, prijzen zichtbaar, beschikbaarheid zichtbaar, woningkenmerken (m²/slaapkamers), downloads (brochure/prijslijst), voldoende renders/foto\'s, woningen vergelijkbaar.\n4. Conversie & Call-to-Actions (weging 15, 5 vragen, max raw 10): CTA op homepage, CTA op woningdetailpagina, online inschrijving mogelijk, contactformulier aanwezig, contactgegevens eenvoudig vindbaar.\n5. Projectinformatie (weging 10, 5 vragen, max raw 10): planning zichtbaar, locatie uitgelegd, omgeving beschreven, voorzieningen benoemd, duurzaamheid aanwezig.\n6. Vertrouwen & Geloofwaardigheid (weging 10, 5 vragen, max raw 10): ontwikkelaar vermeld, makelaar vermeld, volledige contactgegevens, FAQ aanwezig, privacy- en cookiepagina\'s aanwezig.\n7. Content & Leesbaarheid (weging 10, 5 vragen, max raw 10): alle pagina\'s gevuld, geen placeholdertekst, tussenkoppen aanwezig, teksten actueel, geen spellingsfouten.\n8. Vormgeving & Consistentie (weging 5, 5 vragen, max raw 10): typografie consistent, kleurgebruik consistent, beeldkwaliteit goed, geen layoutfouten, voldoende contrast.\n9. Techniek & Marketing (weging 3, 5 vragen, max raw 10): SSL actief, GTM aanwezig, GA4 aanwezig, cookiebanner aanwezig, meta title+description aanwezig.\n10. SEO & Vindbaarheid (weging 2, 3 vragen, max raw 6): één H1 per pagina, logische URL\'s, afbeeldingen alt-teksten.\n\nGeef ALLEEN dit JSON-object (geen andere tekst):\n{"total":<0-100>,"categories":[{"name":"Hero & Eerste indruk","weight":10,"score":<0.0-10.0>,"strong":["punt","punt"],"improve":["punt","punt"],"evidence":"pagina – wat gevonden"},{"name":"Navigatie & Gebruiksvriendelijkheid","weight":15,"score":<0.0-15.0>,"strong":["punt","punt"],"improve":["punt","punt"],"evidence":"pagina – wat gevonden"},{"name":"Woninginformatie & Beschikbaarheid","weight":20,"score":<0.0-20.0>,"strong":["punt","punt"],"improve":["punt","punt"],"evidence":"pagina – wat gevonden"},{"name":"Conversie & Call-to-Actions","weight":15,"score":<0.0-15.0>,"strong":["punt","punt"],"improve":["punt","punt"],"evidence":"pagina – wat gevonden"},{"name":"Projectinformatie","weight":10,"score":<0.0-10.0>,"strong":["punt","punt"],"improve":["punt","punt"],"evidence":"pagina – wat gevonden"},{"name":"Vertrouwen & Geloofwaardigheid","weight":10,"score":<0.0-10.0>,"strong":["punt","punt"],"improve":["punt","punt"],"evidence":"pagina – wat gevonden"},{"name":"Content & Leesbaarheid","weight":10,"score":<0.0-10.0>,"strong":["punt","punt"],"improve":["punt","punt"],"evidence":"pagina – wat gevonden"},{"name":"Vormgeving & Consistentie","weight":5,"score":<0.0-5.0>,"strong":["punt","punt"],"improve":["punt","punt"],"evidence":"pagina – wat gevonden"},{"name":"Techniek & Marketing","weight":3,"score":<0.0-3.0>,"strong":["punt","punt"],"improve":["punt","punt"],"evidence":"pagina – wat gevonden"},{"name":"SEO & Vindbaarheid","weight":2,"score":<0.0-2.0>,"strong":["punt","punt"],"improve":["punt","punt"],"evidence":"pagina – wat gevonden"}],"opener":"gespreksopener van 2-3 zinnen voor een makelaar"}';
 }
 
 function renderResults(d){
   var tp=d.total/100;
   var tc=clr(tp);
-  var vt=tp>=.7?'Sterke basis':tp>=.45?'Verbeterpotentieel':'Urgent bijwerken';
+  var vt=tp>=.9?'Uitstekend':tp>=.75?'Goed':tp>=.6?'Voldoende':tp>=.4?'Matig':'Onvoldoende';
 
   var ts=document.getElementById('topScore');
   ts.textContent=d.total+' / 100';
   ts.className='top-score bg-'+tc;
   ts.style.display='inline-block';
 
-  var dims=(d.dimensions||[]).map(function(dim,i){
-    var dp=dim.score/dim.max;
-    var dc=clr(dp);
-    var bw=Math.round(dp*100);
+  var cats=(d.categories||[]).map(function(cat,i){
+    var score=parseFloat(cat.score)||0;
+    var cp=score/cat.weight;
+    var dc=clr(cp);
+    var bw=Math.round(cp*100);
     var num=i<9?'0'+(i+1):''+(i+1);
-    var fb=(dim.feedback||[]).map(function(f){
-      return '<div class="fb-item"><div class="fb-dot"></div><div class="fb-text">'+esc(f)+'</div></div>';
+    var strongHtml=(cat.strong||[]).map(function(s){
+      return '<div class="fb-item"><div class="fb-dot" style="background:#89B647"></div><div class="fb-text">'+esc(s)+'</div></div>';
     }).join('');
+    var improveHtml=(cat.improve||[]).map(function(s){
+      return '<div class="fb-item"><div class="fb-dot" style="background:var(--rood)"></div><div class="fb-text">'+esc(s)+'</div></div>';
+    }).join('');
+    var evidenceHtml=cat.evidence
+      ?'<div class="fb-lbl" style="color:var(--koud)">Bewijs</div>'
+       +'<div style="font-size:12px;color:var(--koud);padding:8px 14px;background:var(--bg);border:1px solid var(--bd);border-radius:var(--rsm);margin-bottom:7px;">'+esc(cat.evidence)+'</div>'
+      :'';
     return '<div class="dim-row">'
       +'<div class="dim-head" onclick="tog(this)">'
       +'<span class="dnb">'+num+'</span>'
-      +'<span class="dtitle">'+esc(dim.name)+'</span>'
-      +'<span class="dscore"><span class="dscore-val '+dc+'">'+dim.score+'</span><span class="dscore-max"> / '+dim.max+'</span></span>'
+      +'<span class="dtitle">'+esc(cat.name)+'</span>'
+      +'<span class="dscore"><span class="dscore-val '+dc+'">'+score.toFixed(1)+'</span><span class="dscore-max"> / '+cat.weight+'</span></span>'
       +'<svg class="chev" width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 5l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'
       +'</div>'
-      +'<div class="dbar"><div class="dbar-fill" style="width:'+bw+'%;background:'+barClr(dp)+'"></div></div>'
-      +'<div class="dbody">'+(fb?'<div class="fb-lbl">Verbeterpunten</div>'+fb:'')+'</div>'
-      +'</div>';
+      +'<div class="dbar"><div class="dbar-fill" style="width:'+bw+'%;background:'+barClr(cp)+'"></div></div>'
+      +'<div class="dbody">'
+      +(strongHtml?'<div class="fb-lbl">Sterke punten</div>'+strongHtml:'')
+      +(improveHtml?'<div class="fb-lbl">Verbeterpunten</div>'+improveHtml:'')
+      +evidenceHtml
+      +'</div></div>';
   }).join('');
 
   var opener=d.opener
@@ -365,7 +376,7 @@ function renderResults(d){
     +'<span class="score-sub">/ 100</span>'
     +'<span class="verdict bg-'+tc+'">'+vt+'</span>'
     +'</div></div>'
-    +dims+opener
+    +cats+opener
     +'<div class="actions">'
     +'<button class="act-btn act-primary" id="dlBtn" onclick="downloadPdf()">&#8595; Download PDF</button>'
     +'<button class="act-btn act-ghost" onclick="newScan()">+ Nieuwe scan</button>'
@@ -399,7 +410,7 @@ function newScan(){
   document.getElementById('urlIn').focus();
 }
 
-/* ── PDF GENERATION ─────────────────────────────────────────── */
+/* ── PDF GENERATION — one-pager ─────────────────────────────── */
 function downloadPdf(){
   if(!_scanData) return;
   var d=_scanData;
@@ -409,74 +420,81 @@ function downloadPdf(){
 
   var tp=d.total/100;
   var tc=tp>=.7?'#89B647':tp>=.45?'#d4a832':'#d9713e';
-  var vt=tp>=.7?'Sterke basis':tp>=.45?'Verbeterpotentieel':'Urgent bijwerken';
+  var vt=tp>=.9?'Uitstekend':tp>=.75?'Goed':tp>=.6?'Voldoende':tp>=.4?'Matig':'Onvoldoende';
   var vtBg=tp>=.7?'rgba(137,182,71,.12)':tp>=.45?'rgba(212,168,50,.12)':'rgba(217,113,62,.12)';
   var vtBd=tp>=.7?'rgba(137,182,71,.3)':tp>=.45?'rgba(212,168,50,.3)':'rgba(217,113,62,.3)';
 
   var now=new Date();
   var dateStr=now.getDate()+' '+'januari februari maart april mei juni juli augustus september oktober november december'.split(' ')[now.getMonth()]+' '+now.getFullYear();
+  var domain=d.url.replace(/^https?:\/\//,'').split('/')[0];
 
-  var dimsHtml=(d.dimensions||[]).map(function(dim,i){
-    var dp=dim.score/dim.max;
-    var dc=dp>=.7?'#89B647':dp>=.45?'#d4a832':'#d9713e';
-    var bw=Math.round(dp*100);
+  var catsHtml=(d.categories||[]).map(function(cat,i){
+    var score=parseFloat(cat.score)||0;
+    var cp=score/cat.weight;
+    var dc=cp>=.7?'#89B647':cp>=.45?'#d4a832':'#d9713e';
+    var bw=Math.round(cp*100);
     var num=i<9?'0'+(i+1):''+(i+1);
-    var fb=(dim.feedback||[]).map(function(f){
-      return '<div style="display:flex;gap:10px;padding:9px 13px;background:#0c0c0c;border:1px solid #2f2f2d;border-radius:7px;margin-bottom:6px;">'
-        +'<div style="width:5px;height:5px;border-radius:50%;background:#7CA73F;flex-shrink:0;margin-top:8px;"></div>'
-        +'<div style="font-size:12.5px;color:#AFAEB2;line-height:1.5;">'+esc(f)+'</div>'
-        +'</div>';
-    }).join('');
-    return '<div style="background:#161615;border:1px solid #2f2f2d;border-radius:11px;overflow:hidden;margin-bottom:8px;">'
-      +'<div style="display:flex;align-items:center;gap:12px;padding:13px 16px;">'
-      +'<span style="font-size:9px;font-weight:800;letter-spacing:.07em;color:#89B647;background:rgba(137,182,71,.1);padding:3px 8px;border-radius:999px;flex-shrink:0;">'+num+'</span>'
-      +'<span style="font-size:13.5px;font-weight:700;flex:1;color:#fff;">'+esc(dim.name)+'</span>'
-      +'<span style="font-size:18px;font-weight:800;color:'+dc+';">'+dim.score+'</span>'
-      +'<span style="font-size:10.5px;color:#AFAEB2;"> / '+dim.max+'</span>'
+    return '<div style="background:#161615;border:1px solid #2f2f2d;border-radius:9px;padding:11px 13px;">'
+      +'<div style="display:flex;align-items:center;gap:7px;margin-bottom:7px;">'
+      +'<span style="font-size:8px;font-weight:800;letter-spacing:.06em;color:#89B647;background:rgba(137,182,71,.1);padding:2px 7px;border-radius:999px;flex-shrink:0;">'+num+'</span>'
+      +'<span style="font-size:11px;font-weight:700;flex:1;color:#fff;line-height:1.25;">'+esc(cat.name)+'</span>'
+      +'<span style="font-size:15px;font-weight:800;color:'+dc+';">'+score.toFixed(1)+'</span>'
+      +'<span style="font-size:9px;color:#AFAEB2;">/'+cat.weight+'</span>'
       +'</div>'
-      +'<div style="height:3px;background:#3C3C3B;margin:0 16px;">'
+      +'<div style="height:3px;background:#3C3C3B;border-radius:999px;">'
       +'<div style="height:100%;border-radius:999px;background:'+dc+';width:'+bw+'%;"></div>'
       +'</div>'
-      +(fb?'<div style="padding:0 16px 14px;">'
-        +'<div style="font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#8a8a8c;margin:12px 0 8px;">Verbeterpunten</div>'
-        +fb+'</div>':'')
       +'</div>';
   }).join('');
 
   var openerHtml=d.opener
-    ?'<div style="margin-top:20px;background:linear-gradient(135deg,rgba(124,167,63,.08),rgba(137,182,71,.03));border:1px solid rgba(124,167,63,.2);border-radius:11px;padding:20px 22px;">'
-      +'<div style="font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#89B647;margin-bottom:10px;">Gespreksopener voor de klant</div>'
-      +'<div style="font-size:14px;color:#AFAEB2;line-height:1.7;font-style:italic;">'+esc(d.opener)+'</div>'
+    ?'<div style="margin-top:16px;background:linear-gradient(135deg,rgba(124,167,63,.08),rgba(137,182,71,.03));border:1px solid rgba(124,167,63,.22);border-radius:10px;padding:15px 18px;">'
+      +'<div style="font-size:8px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#89B647;margin-bottom:7px;">Gespreksopener voor de klant</div>'
+      +'<div style="font-size:12.5px;color:#AFAEB2;line-height:1.65;font-style:italic;">'+esc(d.opener)+'</div>'
       +'</div>'
     :'';
 
-  var domain=d.url.replace(/^https?:\/\//,'').split('/')[0];
-
   document.getElementById('pdf-output').innerHTML=
-    '<div style="padding:40px;background:#0c0c0c;font-family:Raleway,system-ui,sans-serif;">'
-    // Header
-    +'<div style="display:flex;align-items:center;gap:14px;padding-bottom:24px;border-bottom:1px solid #3C3C3B;margin-bottom:32px;">'
-    +'<div style="width:36px;height:36px;background:#7CA73F;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;color:#fff;flex-shrink:0;">S</div>'
+    '<div style="padding:30px 36px;background:#0c0c0c;font-family:Raleway,system-ui,sans-serif;box-sizing:border-box;">'
+
+    /* ── Header ── */
+    +'<div style="display:flex;align-items:center;gap:12px;padding-bottom:16px;border-bottom:1px solid #3C3C3B;margin-bottom:20px;">'
+    +'<div style="width:32px;height:32px;background:#7CA73F;border-radius:7px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;color:#fff;flex-shrink:0;">S</div>'
     +'<div>'
-    +'<div style="font-weight:800;font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:#7CA73F;">Spring Real Estate</div>'
-    +'<div style="font-size:9px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:#AFAEB2;margin-top:2px;">CRO-scan Rapport &middot; Projectwebsites</div>'
+    +'<div style="font-weight:800;font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:#7CA73F;line-height:1.2;">Spring Real Estate</div>'
+    +'<div style="font-size:8px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:#AFAEB2;margin-top:2px;">CRO-scan Rapport &middot; Projectwebsites</div>'
     +'</div>'
-    +'<div style="margin-left:auto;font-size:11px;color:#8a8a8c;">'+dateStr+'</div>'
+    +'<div style="margin-left:auto;font-size:9.5px;color:#8a8a8c;">'+dateStr+'</div>'
     +'</div>'
-    // Score header
-    +'<div style="text-align:center;margin-bottom:36px;">'
-    +'<div style="font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#AFAEB2;margin-bottom:14px;">'+esc(d.url)+'</div>'
-    +'<div style="font-size:80px;font-weight:800;letter-spacing:-.04em;line-height:1;color:'+tc+';">'+d.total+'</div>'
-    +'<div style="font-size:15px;color:#AFAEB2;font-weight:600;margin-top:4px;">/ 100</div>'
-    +'<div style="display:inline-block;margin-top:12px;padding:6px 18px;border-radius:999px;font-size:10.5px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;background:'+vtBg+';border:1px solid '+vtBd+';color:'+tc+';">'+vt+'</div>'
+
+    /* ── Score block ── */
+    +'<div style="display:flex;align-items:center;gap:28px;margin-bottom:20px;padding:18px 22px;background:#161615;border:1px solid #2f2f2d;border-radius:11px;">'
+    +'<div style="flex:1;">'
+    +'<div style="font-size:8.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#8a8a8c;margin-bottom:5px;">Beoordeelde website</div>'
+    +'<div style="font-size:12.5px;font-weight:700;color:#fff;word-break:break-all;line-height:1.4;">'+esc(d.url)+'</div>'
     +'</div>'
-    // Dimensions
-    +dimsHtml
-    // Opener
+    +'<div style="text-align:right;flex-shrink:0;">'
+    +'<div style="font-size:64px;font-weight:800;letter-spacing:-.04em;line-height:1;color:'+tc+';">'+d.total+'</div>'
+    +'<div style="font-size:12px;color:#AFAEB2;font-weight:600;margin-top:2px;">/ 100 punten</div>'
+    +'<div style="display:inline-block;margin-top:7px;padding:4px 14px;border-radius:999px;font-size:8.5px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;background:'+vtBg+';border:1px solid '+vtBd+';color:'+tc+';">'+vt+'</div>'
+    +'</div>'
+    +'</div>'
+
+    /* ── Categories label ── */
+    +'<div style="font-size:8px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#8a8a8c;margin-bottom:9px;">Categorieoverzicht</div>'
+
+    /* ── 2-column grid ── */
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;">'
+    +catsHtml
+    +'</div>'
+
+    /* ── Opener ── */
     +openerHtml
-    // Footer
-    +'<div style="margin-top:36px;padding-top:20px;border-top:1px solid #3C3C3B;text-align:center;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:#8a8a8c;">'
-    +'Spring Real Estate &nbsp;&middot;&nbsp; Projectmarketing &amp; Makelaardij'
+
+    /* ── Footer ── */
+    +'<div style="margin-top:20px;padding-top:14px;border-top:1px solid #3C3C3B;display:flex;align-items:center;justify-content:space-between;">'
+    +'<div style="font-size:8px;letter-spacing:.08em;text-transform:uppercase;color:#8a8a8c;">Spring Real Estate &nbsp;&middot;&nbsp; Projectmarketing &amp; Makelaardij</div>'
+    +'<div style="font-size:8px;color:#3C3C3B;">samklijn.github.io/spring-cro</div>'
     +'</div>'
     +'</div>';
 
@@ -485,7 +503,7 @@ function downloadPdf(){
   html2pdf().set({
     margin:0,
     filename:'CRO-scan-'+domain+'.pdf',
-    image:{type:'jpeg',quality:0.95},
+    image:{type:'jpeg',quality:0.97},
     html2canvas:{scale:2,useCORS:true,backgroundColor:'#0c0c0c',logging:false},
     jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}
   }).from(el).save().then(function(){
