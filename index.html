@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;600;700;800&display=swap" rel="stylesheet">
 <script>/* force fresh load when version changes */
-(function(){var v='v18';if(sessionStorage.getItem('cro-ver')!==v){sessionStorage.setItem('cro-ver',v);if(window.location.href.indexOf('nocache')<0){window.location.replace(window.location.href+(window.location.href.indexOf('?')>=0?'&':'?')+'nocache='+v);}}})();
+(function(){var v='v19';if(sessionStorage.getItem('cro-ver')!==v){sessionStorage.setItem('cro-ver',v);if(window.location.href.indexOf('nocache')<0){window.location.replace(window.location.href+(window.location.href.indexOf('?')>=0?'&':'?')+'nocache='+v);}}})();
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
@@ -132,6 +132,14 @@ h1 em{font-style:normal;color:var(--gl)}
 .q-text{font-size:13px;color:var(--muted);line-height:1.5}
 .top3-item{display:flex;align-items:flex-start;gap:12px;margin-bottom:10px}
 .top3-n{width:22px;height:22px;border-radius:50%;background:var(--g);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#fff;flex-shrink:0}
+.history-wrap{width:100%;max-width:620px;margin-top:22px}
+.history-lbl{font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--koud);margin-bottom:9px}
+.history-chips{display:flex;flex-wrap:wrap;gap:8px}
+.h-chip{background:var(--sur);border:1px solid var(--bd);border-radius:10px;padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:9px;transition:border-color .15s}
+.h-chip:hover{border-color:var(--g)}
+.h-domain{font-size:12px;font-weight:700;color:var(--ink)}
+.h-score{font-size:11px;font-weight:800;padding:2px 9px;border-radius:999px}
+.h-date{font-size:10px;color:var(--koud)}
 
 .opener{margin-top:24px;background:linear-gradient(135deg,rgba(124,167,63,.08),rgba(137,182,71,.03));border:1px solid rgba(124,167,63,.2);border-radius:var(--r);padding:22px 24px}
 .opener-lbl{font-size:9.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--gl);margin-bottom:11px}
@@ -218,6 +226,11 @@ footer{text-align:center;font-size:10.5px;color:var(--koud);padding:20px;border-
     </div>
   </div>
 
+  <div class="history-wrap" id="historyWrap" style="display:none">
+    <div class="history-lbl">Recente scans</div>
+    <div class="history-chips" id="historyChips"></div>
+  </div>
+
   <div class="dims" id="dimPills">
     <div class="dim-pill"><span class="dim-n">01</span>Hero &amp; waardepropositie<span class="dim-pt">10pt</span></div>
     <div class="dim-pill"><span class="dim-n">02</span>Conversie &amp; CTA's<span class="dim-pt">20pt</span></div>
@@ -267,6 +280,7 @@ var CATS = [
 window.addEventListener('DOMContentLoaded', function() {
   if (!localStorage.getItem(KEY_STORE)) showSetup();
   document.getElementById('urlIn').addEventListener('keydown', function(e){ if(e.key==='Enter') doScan(); });
+  renderHistory();
 });
 
 function showSetup(){ document.getElementById('setupModal').style.display='flex'; }
@@ -342,10 +356,7 @@ async function fetchViaJina(url){
   try{
     var ctrl=new AbortController();
     var t=setTimeout(function(){ctrl.abort();},12000);
-    var r=await fetch('https://r.jina.ai/'+url,{
-      signal:ctrl.signal,
-      headers:{'Accept':'text/plain','X-Return-Format':'text'}
-    });
+    var r=await fetch('https://r.jina.ai/'+url,{signal:ctrl.signal,headers:{'Accept':'text/plain','X-Return-Format':'text'}});
     clearTimeout(t);
     if(!r.ok) return '';
     var text=await r.text();
@@ -353,42 +364,77 @@ async function fetchViaJina(url){
   }catch(e){ return ''; }
 }
 
+function extractTechBlock(html,url){
+  var ssl=url.startsWith('https://')?'Ja':'Nee';
+  if(!html) return '=== TECHNISCHE FEITEN ===\nSSL: '+ssl+'\nOverige checks: HTML niet bereikbaar via proxy\n=== EINDE TECH ===\n\n';
+  var gtm=/GTM-[A-Z0-9]+|googletagmanager\.com\/gtm\.js/.test(html)?'Ja':'Nee';
+  var ga4=/G-[A-Z0-9]{4,}|gtag\.js|google-analytics\.com\/analytics\.js/.test(html)?'Ja':'Nee';
+  var cookie=/cookiebot|cookieconsent|borlabs|onetrust|complianz|cookie-notice|cc-nb|cookiewall|klaro/i.test(html)?'Ja':'Nee';
+  var titleOk=/<title[^>]*>[^<]{3,}<\/title>/i.test(html)?'Ja':'Nee';
+  var metaOk=/<meta[^>]+name=["']description["'][^>]+content=["'][^"']{10,}/i.test(html)||/<meta[^>]+content=["'][^"']{10,}["'][^>]+name=["']description["']/i.test(html)?'Ja':'Nee';
+  var h1n=(html.match(/<h1[\s>]/gi)||[]).length;
+  var imgN=(html.match(/<img[\s>]/gi)||[]).length;
+  var altN=(html.match(/<img[^>]+alt=["'][^"']+["']/gi)||[]).length;
+  return '=== TECHNISCHE FEITEN (gebruik als definitieve antwoorden voor categorie 9 en 10) ===\n'+
+    'SSL actief: '+ssl+'\n'+
+    'Google Tag Manager: '+gtm+'\n'+
+    'Google Analytics 4: '+ga4+'\n'+
+    'Cookiebanner: '+cookie+'\n'+
+    'Meta title aanwezig: '+titleOk+'\n'+
+    'Meta description aanwezig: '+metaOk+'\n'+
+    'H1-tags op homepage: '+h1n+' (1 = goed, meer = probleem)\n'+
+    'Afbeeldingen met alt-tekst: '+altN+' van '+imgN+'\n'+
+    '=== EINDE TECH ===\n\n';
+}
+
+function detectSubpages(text,base){
+  var targets=[
+    {re:/\/(aanbod|woningen|beschikbaar|appartementen|studio|loft|woning-?type|bouwnummer|unit)/i,  label:'AANBODPAGINA',  jina:true},
+    {re:/\/(contact|contactgegevens|bereikbaar)/i,                                                  label:'CONTACTPAGINA', jina:false},
+    {re:/\/(faq|veelgestelde-vragen|vragen)/i,                                                      label:'FAQ',           jina:false},
+    {re:/\/(downloads?|brochure)/i,                                                                 label:'DOWNLOADS',     jina:false},
+  ];
+  var found={},result=[];
+  var hrefs=[];
+  text.replace(/\[([^\]]*)\]\((https?:\/\/[^)]+|\/[^)]+)\)/g,function(_,t,h){hrefs.push(h);});
+  text.replace(/href=["']([^"']+)["']/gi,function(_,h){hrefs.push(h);});
+  hrefs.forEach(function(h){
+    targets.forEach(function(t){
+      if(found[t.label]) return;
+      if(t.re.test(h)){
+        found[t.label]=true;
+        var full=h.startsWith('http')?h:(h.startsWith('/')?base+h:base+'/'+h);
+        result.push({url:full,label:t.label,jina:t.jina});
+      }
+    });
+  });
+  return result;
+}
+
 async function fetchPageContent(url){
   var base=url.replace(/^(https?:\/\/[^/]+).*/,'$1');
+  var stRow=document.getElementById('stRow');
 
-  /* Strategie 1: Jina AI Reader — rendert JS, omzeilt Cloudflare */
-  var jinaText=await fetchViaJina(url);
-  if(jinaText){
-    /* probeer ook de aanbodpagina via Jina als die gelinkt is */
-    var subM=jinaText.match(/\(https?:\/\/[^)]*\/(aanbod|woningen|beschikbaar|appartementen|plattegrond)[^)]*\)/gi);
-    if(subM&&subM.length){
-      var subUrl=subM[0].replace(/^\(|\)$/g,'');
-      document.getElementById('stRow').innerHTML='<div class="dot"></div><span>Aanbodpagina ophalen…</span>';
-      var sub2=await fetchViaJina(subUrl);
-      if(sub2) jinaText+='\n\n=== AANBODPAGINA ===\n'+sub2.substring(0,5000);
-    }
-    return jinaText.substring(0,14000);
-  }
+  stRow.innerHTML='<div class="dot"></div><span>Pagina ophalen…</span>';
+  var [rawHtml,jinaText]=await Promise.all([fetchRawHtml(url),fetchViaJina(url)]);
 
-  /* Strategie 2: raw HTML via proxy-keten */
-  document.getElementById('stRow').innerHTML='<div class="dot"></div><span>Pagina ophalen via proxy…</span>';
-  var html=await fetchRawHtml(url);
-  if(!html) return '';
-  var content=extractContent(html);
-  var subLinks=[];
-  html.replace(/href=["']([^"'#?]+)["']/gi,function(_,h){
-    if(/\/(aanbod|woningen|beschikbaar|huizen|appartementen|woning-?types?|bouwnummers?|units?|plattegrond)/i.test(h)){
-      var full=h.startsWith('http')?h:(h.startsWith('/')?base+h:base+'/'+h);
-      subLinks.push(full);
-    }
-  });
-  subLinks=[...new Set(subLinks)];
-  if(subLinks.length){
-    document.getElementById('stRow').innerHTML='<div class="dot"></div><span>Aanbodpagina ophalen…</span>';
-    var subHtml=await fetchRawHtml(subLinks[0]);
-    if(subHtml) content+='\n\n=== AANBODPAGINA ('+subLinks[0]+') ===\n'+extractContent(subHtml);
+  var techBlock=extractTechBlock(rawHtml,url);
+  var mainContent=jinaText||(rawHtml?extractContent(rawHtml):'');
+  if(!mainContent) return techBlock;
+
+  var subpages=detectSubpages((jinaText||'')+(rawHtml||''),base);
+  if(subpages.length){
+    stRow.innerHTML='<div class="dot"></div><span>Subpagina\'s ophalen ('+subpages.length+')…</span>';
+    var subResults=await Promise.all(subpages.map(function(s){
+      return (s.jina?fetchViaJina(s.url):fetchRawHtml(s.url)).then(function(h){return{s:s,h:h};});
+    }));
+    subResults.forEach(function(r){
+      if(!r.h||r.h.length<200) return;
+      var txt=r.s.jina?r.h.substring(0,4000):extractContent(r.h).substring(0,2500);
+      mainContent+='\n\n=== '+r.s.label+' ('+r.s.url+') ===\n'+txt;
+    });
   }
-  return content.substring(0,14000);
+  return (techBlock+mainContent).substring(0,18000);
 }
 
 async function doScan(){
@@ -448,6 +494,7 @@ async function doScan(){
     _scanData=result;
     bar.classList.remove('show');
     renderResults(result);
+    saveHistory(result);
   }catch(e){
     document.getElementById('stLbl').textContent='Fout';
     document.getElementById('stLbl').style.color='var(--rood)';
@@ -481,6 +528,7 @@ function buildPrompt(url, pageContent){
     '- Gedeeltelijk = aanwezig maar beperkt, vaag, of alleen als link/nav zonder inhoud\n'+
     '- Nee = nergens in de tekst te vinden\n'+
     '- SPA-uitzondering: staat een pagina in NAV of LINKS (/woningen, /aanbod, /plattegronden) = Gedeeltelijk\n'+
+    '- TECHNISCHE FEITEN (=== TECHNISCHE FEITEN ===): gebruik die als definitieve antwoorden voor categorie 9 en 10 — NIET je eigen gissing\n'+
     '- Categoriescore = (som punten / max raw) x weging, 1 decimaal\n'+
     '- Total = exacte som van alle 10 categoriescores\n\n'+
     'VELDREGELS:\n'+
@@ -604,6 +652,7 @@ function newScan(){
   document.getElementById('hero').style.paddingTop='';
   document.getElementById('hero').style.paddingBottom='';
   document.getElementById('topScore').style.display='none';
+  renderHistory();
   document.getElementById('urlIn').focus();
 }
 
@@ -802,6 +851,58 @@ function downloadPdf(){
   doc.save('CRO-scan-'+domain+'.pdf');
   btn.disabled=false;
   btn.innerHTML='&#8595; Download PDF';
+}
+
+/* ── SCANGESCHIEDENIS ─────────────────────────────────────────── */
+var HIST_KEY='spring_cro_history';
+var MONTHS=['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'];
+
+function saveHistory(d){
+  var h=getHistory();
+  h=h.filter(function(x){return x.url!==d.url;});
+  var now=new Date();
+  h.unshift({url:d.url,domain:d.url.replace(/^https?:\/\//,'').split('/')[0],total:d.total,date:now.getDate()+' '+MONTHS[now.getMonth()],data:d});
+  h=h.slice(0,8);
+  try{localStorage.setItem(HIST_KEY,JSON.stringify(h));}catch(e){}
+  renderHistory();
+}
+
+function getHistory(){
+  try{return JSON.parse(localStorage.getItem(HIST_KEY))||[];}catch(e){return[];}
+}
+
+function renderHistory(){
+  var wrap=document.getElementById('historyWrap');
+  var chips=document.getElementById('historyChips');
+  if(!wrap||!chips) return;
+  var h=getHistory();
+  if(!h.length){wrap.style.display='none';return;}
+  wrap.style.display='block';
+  chips.innerHTML=h.map(function(s,i){
+    var tp=s.total/100;
+    var tc=tp>=.7?'good':tp>=.45?'mid':'low';
+    return '<div class="h-chip" onclick="restoreScan('+i+')">'
+      +'<span class="h-domain">'+esc(s.domain)+'</span>'
+      +'<span class="h-score bg-'+tc+'">'+s.total+'</span>'
+      +'<span class="h-date">'+esc(s.date)+'</span>'
+      +'</div>';
+  }).join('');
+}
+
+function restoreScan(i){
+  var h=getHistory();
+  if(!h[i]) return;
+  var s=h[i];
+  _scanData=s.data;
+  document.getElementById('urlIn').value=s.url;
+  document.getElementById('eyebrow').style.display='none';
+  document.getElementById('heroTitle').style.display='none';
+  document.getElementById('heroSub').style.display='none';
+  document.getElementById('dimPills').style.display='none';
+  document.getElementById('historyWrap').style.display='none';
+  document.getElementById('hero').style.paddingTop='28px';
+  document.getElementById('hero').style.paddingBottom='28px';
+  renderResults(s.data);
 }
 </script>
 </body>
