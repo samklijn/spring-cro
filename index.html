@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;600;700;800&display=swap" rel="stylesheet">
 <script>/* force fresh load when version changes */
-(function(){var v='v13';if(sessionStorage.getItem('cro-ver')!==v){sessionStorage.setItem('cro-ver',v);if(window.location.href.indexOf('nocache')<0){window.location.replace(window.location.href+(window.location.href.indexOf('?')>=0?'&':'?')+'nocache='+v);}}})();
+(function(){var v='v14';if(sessionStorage.getItem('cro-ver')!==v){sessionStorage.setItem('cro-ver',v);if(window.location.href.indexOf('nocache')<0){window.location.replace(window.location.href+(window.location.href.indexOf('?')>=0?'&':'?')+'nocache='+v);}}})();
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
@@ -123,6 +123,15 @@ h1 em{font-style:normal;color:var(--gl)}
 .fb-item{display:flex;gap:11px;padding:11px 15px;background:var(--bg);border:1px solid var(--bd);border-radius:var(--rsm);margin-bottom:7px}
 .fb-dot{width:5px;height:5px;border-radius:50%;background:var(--g);flex-shrink:0;margin-top:8px}
 .fb-text{font-size:13.5px;color:var(--muted);line-height:1.55}
+.q-list{margin-top:4px}
+.q-row{display:flex;align-items:flex-start;gap:9px;padding:7px 10px;border-radius:var(--rsm);margin-bottom:4px;background:var(--bg);border:1px solid var(--bd)}
+.q-badge{font-size:8px;font-weight:800;letter-spacing:.04em;padding:2px 8px;border-radius:999px;flex-shrink:0;margin-top:2px}
+.q-ja{background:rgba(137,182,71,.12);color:#89B647;border:1px solid rgba(137,182,71,.22)}
+.q-ged{background:rgba(212,168,50,.12);color:#d4a832;border:1px solid rgba(212,168,50,.22)}
+.q-nee{background:rgba(217,113,62,.12);color:#d9713e;border:1px solid rgba(217,113,62,.22)}
+.q-text{font-size:13px;color:var(--muted);line-height:1.5}
+.top3-item{display:flex;align-items:flex-start;gap:12px;margin-bottom:10px}
+.top3-n{width:22px;height:22px;border-radius:50%;background:var(--g);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#fff;flex-shrink:0}
 
 .opener{margin-top:24px;background:linear-gradient(135deg,rgba(124,167,63,.08),rgba(137,182,71,.03));border:1px solid rgba(124,167,63,.2);border-radius:var(--r);padding:22px 24px}
 .opener-lbl{font-size:9.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--gl);margin-bottom:11px}
@@ -238,6 +247,19 @@ var GROQ_URL  = 'https://api.groq.com/openai/v1/chat/completions';
 var MODEL     = 'llama-3.3-70b-versatile';
 var _scanData = null;
 
+var CATS = [
+  {n:'Hero & Eerste indruk',              w:10,mr:10,qs:['Projectnaam direct zichtbaar','Locatie direct zichtbaar','Concept duidelijk binnen 5 seconden','Minimaal 2 USP\'s zichtbaar','Primaire CTA boven de vouw']},
+  {n:'Navigatie & Gebruiksvriendelijkheid',w:15,mr:10,qs:['Logisch hoofdmenu','Alle pagina\'s bereikbaar','Mobiel bruikbaar','Woning bereikbaar in max 3 klikken','CTA\'s consistent zichtbaar']},
+  {n:'Woninginformatie & Beschikbaarheid', w:20,mr:16,qs:['Woningzoeker aanwezig','Plattegronden beschikbaar','Prijzen zichtbaar','Beschikbaarheid zichtbaar','Woningkenmerken (m2/slaapkamers)','Downloads (brochure/prijslijst)','Voldoende renders/foto\'s','Woningen vergelijkbaar']},
+  {n:'Conversie & Call-to-Actions',        w:15,mr:10,qs:['CTA op homepage','CTA op woningdetailpagina','Online inschrijving mogelijk','Contactformulier aanwezig','Contactgegevens eenvoudig vindbaar']},
+  {n:'Projectinformatie',                  w:10,mr:10,qs:['Planning zichtbaar','Locatie uitgelegd','Omgeving beschreven','Voorzieningen benoemd','Duurzaamheid aanwezig']},
+  {n:'Vertrouwen & Geloofwaardigheid',     w:10,mr:10,qs:['Ontwikkelaar vermeld','Makelaar vermeld','Volledige contactgegevens','FAQ aanwezig','Privacy- en cookiepagina\'s aanwezig']},
+  {n:'Content & Leesbaarheid',             w:10,mr:10,qs:['Alle pagina\'s gevuld','Geen placeholdertekst','Tussenkoppen aanwezig','Teksten actueel','Geen spellingsfouten']},
+  {n:'Vormgeving & Consistentie',          w:5, mr:10,qs:['Typografie consistent','Kleurgebruik consistent','Beeldkwaliteit goed','Geen layoutfouten','Voldoende contrast']},
+  {n:'Techniek & Marketing',               w:3, mr:10,qs:['SSL actief','GTM aanwezig','GA4 aanwezig','Cookiebanner aanwezig','Meta title en description aanwezig']},
+  {n:'SEO & Vindbaarheid',                 w:2, mr:6, qs:['Een H1 per pagina','Logische URL\'s','Afbeeldingen alt-teksten']}
+];
+
 window.addEventListener('DOMContentLoaded', function() {
   if (!localStorage.getItem(KEY_STORE)) showSetup();
   document.getElementById('urlIn').addEventListener('keydown', function(e){ if(e.key==='Enter') doScan(); });
@@ -255,6 +277,23 @@ function saveKey(){
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function clr(p){ return p>=.7?'good':p>=.45?'mid':'low'; }
 function barClr(p){ return p>=.7?'#89B647':p>=.45?'#d4a832':'#d9713e'; }
+
+async function fetchPageContent(url){
+  try{
+    var ctrl=new AbortController();
+    var t=setTimeout(function(){ctrl.abort();},8000);
+    var r=await fetch(PROXY+url,{signal:ctrl.signal});
+    clearTimeout(t);
+    if(!r.ok) return '';
+    var html=await r.text();
+    html=html.replace(/<script[\s\S]*?<\/script>/gi,'')
+             .replace(/<style[\s\S]*?<\/style>/gi,'')
+             .replace(/<svg[\s\S]*?<\/svg>/gi,'')
+             .replace(/<!--[\s\S]*?-->/g,'')
+             .replace(/<[^>]+>/g,' ');
+    return html.replace(/\s+/g,' ').trim().substring(0,7000);
+  }catch(e){ return ''; }
+}
 
 async function doScan(){
   var apiKey=localStorage.getItem(KEY_STORE);
@@ -278,11 +317,14 @@ async function doScan(){
   document.getElementById('stLbl').textContent='Aan het scannen';
   document.getElementById('stLbl').style.color='';
   document.getElementById('stUrl').textContent=url;
-  document.getElementById('stRow').innerHTML='<div class="dot"></div><span id="stMsg">AI-analyse uitvoeren…</span>';
+  document.getElementById('stRow').innerHTML='<div class="dot"></div><span id="stMsg">Pagina ophalen…</span>';
 
   try{
+    var pageContent=await fetchPageContent(url);
+    document.getElementById('stRow').innerHTML='<div class="dot"></div><span id="stMsg">AI-analyse uitvoeren…</span>';
+
     var groqCtrl=new AbortController();
-    var groqTimer=setTimeout(function(){groqCtrl.abort();},20000);
+    var groqTimer=setTimeout(function(){groqCtrl.abort();},30000);
     var gr=await fetch(GROQ_URL,{
       method:'POST',
       headers:{'Authorization':'Bearer '+apiKey,'Content-Type':'application/json'},
@@ -290,10 +332,10 @@ async function doScan(){
         model:MODEL,
         messages:[
           {role:'system',content:'Je bent een CRO-expert voor Nederlandse nieuwbouw projectwebsites. Antwoord altijd in valide JSON, zonder extra tekst.'},
-          {role:'user',content:buildPrompt(url,'')}
+          {role:'user',content:buildPrompt(url,pageContent)}
         ],
         response_format:{type:'json_object'},
-        max_tokens:2000,
+        max_tokens:4000,
         temperature:0.2
       }),
       signal:groqCtrl.signal
@@ -319,8 +361,22 @@ async function doScan(){
   }
 }
 
-function buildPrompt(url){
-  return 'Je bent een CRO-expert voor Nederlandse nieuwbouw projectwebsites. Analyseer de URL op basis van jouw kennis van het domein en gangbare nieuwbouw projectwebsites. Wees kritisch en realistisch.\n\nURL: '+url+'\n\nBeoordeel 10 categorieën. Scoringsregel per vraag: Ja=2pt, Gedeeltelijk=1pt, Nee=0pt. Categoriescore = (behaalde punten ÷ max punten) × weging. Rond af op 1 decimaal.\n\n1. Hero & Eerste indruk (weging 10, 5 vragen, max raw 10): projectnaam direct zichtbaar, locatie direct zichtbaar, concept duidelijk binnen 5s, minimaal 2 USP\'s zichtbaar, primaire CTA boven de vouw.\n2. Navigatie & Gebruiksvriendelijkheid (weging 15, 5 vragen, max raw 10): logisch hoofdmenu, alle pagina\'s bereikbaar, mobiel bruikbaar, woning bereikbaar in <3 klikken, CTA\'s consistent zichtbaar.\n3. Woninginformatie & Beschikbaarheid (weging 20, 8 vragen, max raw 16): woningzoeker aanwezig, plattegronden beschikbaar, prijzen zichtbaar, beschikbaarheid zichtbaar, woningkenmerken (m²/slaapkamers), downloads (brochure/prijslijst), voldoende renders/foto\'s, woningen vergelijkbaar.\n4. Conversie & Call-to-Actions (weging 15, 5 vragen, max raw 10): CTA op homepage, CTA op woningdetailpagina, online inschrijving mogelijk, contactformulier aanwezig, contactgegevens eenvoudig vindbaar.\n5. Projectinformatie (weging 10, 5 vragen, max raw 10): planning zichtbaar, locatie uitgelegd, omgeving beschreven, voorzieningen benoemd, duurzaamheid aanwezig.\n6. Vertrouwen & Geloofwaardigheid (weging 10, 5 vragen, max raw 10): ontwikkelaar vermeld, makelaar vermeld, volledige contactgegevens, FAQ aanwezig, privacy- en cookiepagina\'s aanwezig.\n7. Content & Leesbaarheid (weging 10, 5 vragen, max raw 10): alle pagina\'s gevuld, geen placeholdertekst, tussenkoppen aanwezig, teksten actueel, geen spellingsfouten.\n8. Vormgeving & Consistentie (weging 5, 5 vragen, max raw 10): typografie consistent, kleurgebruik consistent, beeldkwaliteit goed, geen layoutfouten, voldoende contrast.\n9. Techniek & Marketing (weging 3, 5 vragen, max raw 10): SSL actief, GTM aanwezig, GA4 aanwezig, cookiebanner aanwezig, meta title+description aanwezig.\n10. SEO & Vindbaarheid (weging 2, 3 vragen, max raw 6): één H1 per pagina, logische URL\'s, afbeeldingen alt-teksten.\n\nGeef ALLEEN dit JSON-object (geen andere tekst):\n{"total":<0-100>,"categories":[{"name":"Hero & Eerste indruk","weight":10,"score":<0.0-10.0>,"strong":["punt","punt"],"improve":["punt","punt"],"evidence":"pagina – wat gevonden"},{"name":"Navigatie & Gebruiksvriendelijkheid","weight":15,"score":<0.0-15.0>,"strong":["punt","punt"],"improve":["punt","punt"],"evidence":"pagina – wat gevonden"},{"name":"Woninginformatie & Beschikbaarheid","weight":20,"score":<0.0-20.0>,"strong":["punt","punt"],"improve":["punt","punt"],"evidence":"pagina – wat gevonden"},{"name":"Conversie & Call-to-Actions","weight":15,"score":<0.0-15.0>,"strong":["punt","punt"],"improve":["punt","punt"],"evidence":"pagina – wat gevonden"},{"name":"Projectinformatie","weight":10,"score":<0.0-10.0>,"strong":["punt","punt"],"improve":["punt","punt"],"evidence":"pagina – wat gevonden"},{"name":"Vertrouwen & Geloofwaardigheid","weight":10,"score":<0.0-10.0>,"strong":["punt","punt"],"improve":["punt","punt"],"evidence":"pagina – wat gevonden"},{"name":"Content & Leesbaarheid","weight":10,"score":<0.0-10.0>,"strong":["punt","punt"],"improve":["punt","punt"],"evidence":"pagina – wat gevonden"},{"name":"Vormgeving & Consistentie","weight":5,"score":<0.0-5.0>,"strong":["punt","punt"],"improve":["punt","punt"],"evidence":"pagina – wat gevonden"},{"name":"Techniek & Marketing","weight":3,"score":<0.0-3.0>,"strong":["punt","punt"],"improve":["punt","punt"],"evidence":"pagina – wat gevonden"},{"name":"SEO & Vindbaarheid","weight":2,"score":<0.0-2.0>,"strong":["punt","punt"],"improve":["punt","punt"],"evidence":"pagina – wat gevonden"}],"opener":"gespreksopener van 2-3 zinnen voor een makelaar"}';
+function buildPrompt(url, pageContent){
+  var catLines=CATS.map(function(c,i){
+    var qList=c.qs.map(function(q,j){ return '  '+(j+1)+'. '+q; }).join('\n');
+    return (i+1)+'. '+c.n+' (weging '+c.w+', max raw '+c.mr+'):\n'+qList;
+  }).join('\n');
+
+  var schemaCategories=CATS.map(function(c){
+    var ans=c.qs.map(function(){ return '"Ja|Gedeeltelijk|Nee"'; }).join(',');
+    return '{"name":"'+c.n+'","weight":'+c.w+',"score":<0.0-'+c.w+'>,"answers":['+ans+'],"improve":["concreet verbeterpunt","concreet verbeterpunt"],"evidence":"specifieke pagina of sectie – wat gevonden"}';
+  }).join(',');
+
+  var contentBlock=pageContent
+    ?'\n\n--- PAGINATEKST (gebruik dit als primaire bron voor de beoordeling) ---\n'+pageContent+'\n--- EINDE PAGINATEKST ---'
+    :'\n\n(Paginatekst kon niet worden opgehaald — baseer analyse op URL en domeinnaam.)';
+
+  return 'Analyseer deze nieuwbouw projectwebsite als CRO-expert. Wees kritisch en concreet — baseer je uitsluitend op de paginatekst hieronder.'+contentBlock+'\n\nURL: '+url+'\n\nScoringsregel per vraag: Ja=2pt, Gedeeltelijk=1pt, Nee=0pt.\nCategoriescore = (som antwoordpunten ÷ max raw) × weging. Rond af op 1 decimaal.\nTotal = som van alle categoriescores (0-100).\n\nVragen per categorie:\n'+catLines+'\n\nGeef ALLEEN dit JSON-object, geen andere tekst:\n{"total":<0-100>,"categories":['+schemaCategories+'],"top3":["concrete aanbeveling 1","concrete aanbeveling 2","concrete aanbeveling 3"]}';
 }
 
 function renderResults(d){
@@ -334,38 +390,51 @@ function renderResults(d){
   ts.style.display='inline-block';
 
   var cats=(d.categories||[]).map(function(cat,i){
+    var catDef=CATS[i]||{qs:[],w:10};
     var score=parseFloat(cat.score)||0;
-    var cp=score/cat.weight;
+    var wt=cat.weight||catDef.w;
+    var cp=score/wt;
     var dc=clr(cp);
     var bw=Math.round(cp*100);
     var num=i<9?'0'+(i+1):''+(i+1);
-    var strongHtml=(cat.strong||[]).map(function(s){
-      return '<div class="fb-item"><div class="fb-dot" style="background:#89B647"></div><div class="fb-text">'+esc(s)+'</div></div>';
-    }).join('');
+
+    var checklistHtml='';
+    if(cat.answers&&cat.answers.length){
+      var rows=catDef.qs.map(function(q,j){
+        var a=String(cat.answers[j]||'');
+        var cls=a==='Ja'?'q-ja':a==='Gedeeltelijk'?'q-ged':'q-nee';
+        return '<div class="q-row"><span class="q-badge '+cls+'">'+esc(a||'—')+'</span><span class="q-text">'+esc(q)+'</span></div>';
+      }).join('');
+      checklistHtml='<div class="fb-lbl">Checklist</div><div class="q-list">'+rows+'</div>';
+    }
+
     var improveHtml=(cat.improve||[]).map(function(s){
       return '<div class="fb-item"><div class="fb-dot" style="background:var(--rood)"></div><div class="fb-text">'+esc(s)+'</div></div>';
     }).join('');
     var evidenceHtml=cat.evidence
-      ?'<div class="fb-lbl" style="color:var(--koud)">Bewijs</div>'
-       +'<div style="font-size:12px;color:var(--koud);padding:8px 14px;background:var(--bg);border:1px solid var(--bd);border-radius:var(--rsm);margin-bottom:7px;">'+esc(cat.evidence)+'</div>'
+      ?'<div class="fb-lbl" style="color:var(--koud);margin-top:14px;">Bewijs</div>'
+       +'<div style="font-size:12px;color:var(--koud);padding:8px 14px;background:var(--bg);border:1px solid var(--bd);border-radius:var(--rsm);">'+esc(cat.evidence)+'</div>'
       :'';
     return '<div class="dim-row">'
       +'<div class="dim-head" onclick="tog(this)">'
       +'<span class="dnb">'+num+'</span>'
-      +'<span class="dtitle">'+esc(cat.name)+'</span>'
-      +'<span class="dscore"><span class="dscore-val '+dc+'">'+score.toFixed(1)+'</span><span class="dscore-max"> / '+cat.weight+'</span></span>'
+      +'<span class="dtitle">'+esc(cat.name||catDef.n)+'</span>'
+      +'<span class="dscore"><span class="dscore-val '+dc+'">'+score.toFixed(1)+'</span><span class="dscore-max"> / '+wt+'</span></span>'
       +'<svg class="chev" width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 5l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'
       +'</div>'
       +'<div class="dbar"><div class="dbar-fill" style="width:'+bw+'%;background:'+barClr(cp)+'"></div></div>'
       +'<div class="dbody">'
-      +(strongHtml?'<div class="fb-lbl">Sterke punten</div>'+strongHtml:'')
-      +(improveHtml?'<div class="fb-lbl">Verbeterpunten</div>'+improveHtml:'')
+      +checklistHtml
+      +(improveHtml?'<div class="fb-lbl" style="margin-top:14px;">Verbeterpunten</div>'+improveHtml:'')
       +evidenceHtml
       +'</div></div>';
   }).join('');
 
-  var opener=d.opener
-    ?'<div class="opener"><div class="opener-lbl">Gespreksopener voor de klant</div><div class="opener-text">'+esc(d.opener)+'</div></div>'
+  var top3=(d.top3&&d.top3.length)
+    ?'<div class="opener"><div class="opener-lbl">Top 3 aanbevelingen</div>'
+      +(d.top3||[]).map(function(t,i){
+        return '<div class="top3-item"><div class="top3-n">'+(i+1)+'</div><div class="fb-text" style="font-size:14px;color:var(--ink);line-height:1.55;">'+esc(t)+'</div></div>';
+      }).join('')+'</div>'
     :'';
 
   document.getElementById('resultsSection').innerHTML=
@@ -376,7 +445,7 @@ function renderResults(d){
     +'<span class="score-sub">/ 100</span>'
     +'<span class="verdict bg-'+tc+'">'+vt+'</span>'
     +'</div></div>'
-    +cats+opener
+    +cats+top3
     +'<div class="actions">'
     +'<button class="act-btn act-primary" id="dlBtn" onclick="downloadPdf()">&#8595; Download PDF</button>'
     +'<button class="act-btn act-ghost" onclick="newScan()">+ Nieuwe scan</button>'
@@ -560,23 +629,36 @@ function downloadPdf(){
 
   y+=Math.ceil(cats.length/2)*rowH+3;
 
-  /* ── Gespreksopener ── */
-  if(d.opener){
-    doc.setFillColor(14,20,12);
+  /* ── Top 3 aanbevelingen ── */
+  var top3=d.top3||[];
+  if(top3.length){
+    var totalLines=0;
+    var wrappedAll=top3.map(function(t){ var l=doc.splitTextToSize(t,cW-22); totalLines+=l.length; return l; });
+    var boxH=Math.max(24,12+totalLines*5.2+(top3.length-1)*3);
+    doc.setFillColor(16,20,14);
     doc.setDrawColor(100,140,55);
-    doc.setLineWidth(0.25);
-    var opLines=doc.splitTextToSize(d.opener,cW-10);
-    var opH=Math.max(18,8+opLines.length*4.5);
-    doc.roundedRect(P,y,cW,opH,2,2,'FD');
+    doc.setLineWidth(0.3);
+    doc.roundedRect(P,y,cW,boxH,2.5,2.5,'FD');
     doc.setFont('helvetica','bold');
-    doc.setFontSize(5);
+    doc.setFontSize(6);
     doc.setTextColor(137,182,71);
-    doc.text('GESPREKSOPENER VOOR DE KLANT',P+5,y+5);
-    doc.setFont('helvetica','italic');
-    doc.setFontSize(6.5);
-    doc.setTextColor(175,174,178);
-    doc.text(opLines,P+5,y+10);
-    y+=opH+4;
+    doc.text('TOP 3 AANBEVELINGEN',P+6,y+7);
+    var ty=y+13;
+    top3.forEach(function(t,i){
+      var lines=wrappedAll[i];
+      doc.setFillColor(sC[0],sC[1],sC[2]);
+      doc.circle(P+9,ty+1,2.2,'F');
+      doc.setFont('helvetica','bold');
+      doc.setFontSize(5.5);
+      doc.setTextColor(12,12,12);
+      doc.text(String(i+1),P+9,ty+2.4,{align:'center'});
+      doc.setFont('helvetica','normal');
+      doc.setFontSize(7.5);
+      doc.setTextColor(225,225,225);
+      doc.text(lines,P+15,ty+1.5);
+      ty+=lines.length*5.2+3;
+    });
+    y+=boxH+4;
   }
 
   /* ── Footer ── */
