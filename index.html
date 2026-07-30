@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;600;700;800&display=swap" rel="stylesheet">
 <script>/* force fresh load when version changes */
-(function(){var v='v17';if(sessionStorage.getItem('cro-ver')!==v){sessionStorage.setItem('cro-ver',v);if(window.location.href.indexOf('nocache')<0){window.location.replace(window.location.href+(window.location.href.indexOf('?')>=0?'&':'?')+'nocache='+v);}}})();
+(function(){var v='v18';if(sessionStorage.getItem('cro-ver')!==v){sessionStorage.setItem('cro-ver',v);if(window.location.href.indexOf('nocache')<0){window.location.replace(window.location.href+(window.location.href.indexOf('?')>=0?'&':'?')+'nocache='+v);}}})();
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
@@ -465,17 +465,37 @@ function buildPrompt(url, pageContent){
 
   var schemaCategories=CATS.map(function(c){
     var ans=c.qs.map(function(){ return '"Ja|Gedeeltelijk|Nee"'; }).join(',');
-    return '{"name":"'+c.n+'","weight":'+c.w+',"score":<0.0-'+c.w+'>,"answers":['+ans+'],"improve":["concreet verbeterpunt","concreet verbeterpunt"],"evidence":"specifieke pagina of sectie – wat gevonden"}';
+    return '{"name":"'+c.n+'","weight":'+c.w+',"score":<0.0-'+c.w+'>,'+
+      '"answers":['+ans+'],'+
+      '"improve":["concrete actie + exacte locatie, bijv. \'Homepage hero mist startprijs — toon prijs direct onder projectnaam\'"],'+
+      '"evidence":"letterlijke zin of kop uit de paginatekst als bewijs; bij ontbrekend element: wat er WEL staat op die plek"}';
   }).join(',');
 
   var contentBlock=pageContent
-    ?'\n\n--- PAGINATEKST (gebruik dit als primaire bron voor de beoordeling) ---\n'+pageContent+'\n--- EINDE PAGINATEKST ---'
-    :'\n\n(Paginatekst kon niet worden opgehaald — baseer analyse op URL en domeinnaam.)';
+    ?'\n\n--- PAGINATEKST ---\n'+pageContent+'\n--- EINDE ---'
+    :'\n\n(Pagina niet bereikbaar — gebruik URL en domeinnaam als bron.)';
 
-  return 'Analyseer deze nieuwbouw projectwebsite als CRO-expert. Baseer je UITSLUITEND op de onderstaande paginainhoud — geen aannames.'+contentBlock+'\n\nURL: '+url+'\n\nBELANGRIJKE LEESREGELS:\n- De site is mogelijk gebouwd in React/Vue (SPA). Inhoud die je NIET in de tekst ziet maar wel in ALLE LINKS of NAV staat (bijv. /woningen, /aanbod, /plattegronden, /beschikbaarheid) IS aanwezig op de site — antwoord dan Ja of Gedeeltelijk, niet Nee.\n- Kijk ook naar BTN: regels voor aanwezige CTA-teksten.\n- Kijk naar H1/H2/H3 koppen voor structuur en inhoud.\n- Als een AANBODPAGINA beschikbaar is, gebruik die voor vragen over woningaanbod en plattegronden.\n\nScoringsregel per vraag: Ja=2pt, Gedeeltelijk=1pt, Nee=0pt.\nCategoriescore = (som antwoordpunten ÷ max raw) × weging. Rond af op 1 decimaal.\nTotal = som van alle categoriescores (0-100).\n\nVragen per categorie:\n'+catLines+'\n\nGeef ALLEEN dit JSON-object, geen andere tekst:\n{"total":<0-100>,"categories":['+schemaCategories+'],"top3":["concrete aanbeveling 1","concrete aanbeveling 2","concrete aanbeveling 3"]}';
+  return 'Je bent een CRO-expert voor Nederlandse nieuwbouw projectwebsites. Lees de paginatekst hieronder WOORD VOOR WOORD. Geen aannames — alleen wat letterlijk staat.'+contentBlock+'\n\nURL: '+url+'\n\n'+
+    'SCORINGSREGELS (streng):\n'+
+    '- Ja = element staat EXPLICIET en volledig in de gelezen tekst\n'+
+    '- Gedeeltelijk = aanwezig maar beperkt, vaag, of alleen als link/nav zonder inhoud\n'+
+    '- Nee = nergens in de tekst te vinden\n'+
+    '- SPA-uitzondering: staat een pagina in NAV of LINKS (/woningen, /aanbod, /plattegronden) = Gedeeltelijk\n'+
+    '- Categoriescore = (som punten / max raw) x weging, 1 decimaal\n'+
+    '- Total = exacte som van alle 10 categoriescores\n\n'+
+    'VELDREGELS:\n'+
+    '- answers[]: Ja/Gedeeltelijk/Nee per vraag, in volgorde\n'+
+    '- improve[]: 1-3 punten ALLEEN voor Nee/Gedeeltelijk. Formaat: "[pagina/sectie]: [wat ontbreekt] — [concrete actie]". Bijv. "Homepage hero: geen zichtbare startprijs — voeg \'Appartementen vanaf EUR X\' toe direct onder de headline" of "/woningen-pagina: geen filteropties — voeg filter op kamers en prijs toe"\n'+
+    '- evidence: citeer een LETTERLIJKE zin of kop uit de tekst als bewijs. Bij ontbrekend element: beschrijf wat er wél staat op die plek.\n\n'+
+    'Vragen:\n'+catLines+'\n\n'+
+    'Geef ALLEEN dit JSON:\n'+
+    '{"total":<0-100>,"categories":['+schemaCategories+'],"top3":["[pagina/element]: wat ontbreekt — concrete actie","idem","idem"]}';
 }
 
 function renderResults(d){
+  var recalc=0;
+  (d.categories||[]).forEach(function(cat){recalc+=parseFloat(cat.score)||0;});
+  if(recalc>0) d.total=Math.round(recalc);
   var tp=d.total/100;
   var tc=clr(tp);
   var vt=tp>=.9?'Uitstekend':tp>=.75?'Goed':tp>=.6?'Voldoende':tp>=.4?'Matig':'Onvoldoende';
@@ -541,6 +561,9 @@ function renderResults(d){
     +'<span class="score-sub">/ 100</span>'
     +'<span class="verdict bg-'+tc+'">'+vt+'</span>'
     +'</div></div>'
+    +'<div style="display:flex;justify-content:flex-end;margin-bottom:10px;">'
+    +'<button class="act-btn act-ghost" id="toggleAllBtn" onclick="toggleAll(this)" style="font-size:10.5px;padding:8px 16px;">&#9698; Alles uitklappen</button>'
+    +'</div>'
     +cats+top3
     +'<div class="actions">'
     +'<button class="act-btn act-primary" id="dlBtn" onclick="downloadPdf()">&#8595; Download PDF</button>'
@@ -556,6 +579,15 @@ function tog(head){
   var open=body.classList.contains('open');
   body.classList.toggle('open',!open);
   ch.classList.toggle('open',!open);
+}
+
+function toggleAll(btn){
+  var bodies=document.querySelectorAll('.dbody');
+  var chevs=document.querySelectorAll('.chev');
+  var anyOpen=[].some.call(bodies,function(b){return b.classList.contains('open');});
+  [].forEach.call(bodies,function(b){b.classList.toggle('open',!anyOpen);});
+  [].forEach.call(chevs,function(c){c.classList.toggle('open',!anyOpen);});
+  btn.innerHTML=anyOpen?'&#9698; Alles uitklappen':'&#9650; Alles inklappen';
 }
 
 function newScan(){
