@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;600;700;800&display=swap" rel="stylesheet">
 <script>/* force fresh load when version changes */
-(function(){var v='v15';if(sessionStorage.getItem('cro-ver')!==v){sessionStorage.setItem('cro-ver',v);if(window.location.href.indexOf('nocache')<0){window.location.replace(window.location.href+(window.location.href.indexOf('?')>=0?'&':'?')+'nocache='+v);}}})();
+(function(){var v='v16';if(sessionStorage.getItem('cro-ver')!==v){sessionStorage.setItem('cro-ver',v);if(window.location.href.indexOf('nocache')<0){window.location.replace(window.location.href+(window.location.href.indexOf('?')>=0?'&':'?')+'nocache='+v);}}})();
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
@@ -242,7 +242,11 @@ footer{text-align:center;font-size:10.5px;color:var(--koud);padding:20px;border-
 
 <script>
 var KEY_STORE = 'spring_groq_key';
-var PROXY     = 'https://corsproxy.io/?';
+var PROXIES   = [
+  {base:'https://corsproxy.io/?',                   enc:false,json:false},
+  {base:'https://api.allorigins.win/get?url=',      enc:true, json:true, field:'contents'},
+  {base:'https://api.codetabs.com/v1/proxy?quest=', enc:false,json:false}
+];
 var GROQ_URL  = 'https://api.groq.com/openai/v1/chat/completions';
 var MODEL     = 'llama-3.3-70b-versatile';
 var _scanData = null;
@@ -279,14 +283,20 @@ function clr(p){ return p>=.7?'good':p>=.45?'mid':'low'; }
 function barClr(p){ return p>=.7?'#89B647':p>=.45?'#d4a832':'#d9713e'; }
 
 async function fetchRawHtml(url){
-  try{
-    var ctrl=new AbortController();
-    var t=setTimeout(function(){ctrl.abort();},7000);
-    var r=await fetch(PROXY+url,{signal:ctrl.signal});
-    clearTimeout(t);
-    if(!r.ok) return '';
-    return await r.text();
-  }catch(e){ return ''; }
+  for(var i=0;i<PROXIES.length;i++){
+    var p=PROXIES[i];
+    var req=p.base+(p.enc?encodeURIComponent(url):url);
+    try{
+      var ctrl=new AbortController();
+      var t=setTimeout(function(){ctrl.abort();},7000);
+      var r=await fetch(req,{signal:ctrl.signal});
+      clearTimeout(t);
+      if(!r.ok) continue;
+      var html=p.json?(await r.json())[p.field]:await r.text();
+      if(html&&html.length>500) return html;
+    }catch(e){/* volgende proxy */}
+  }
+  return '';
 }
 
 function extractContent(html){
