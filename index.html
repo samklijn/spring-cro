@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;600;700;800&display=swap" rel="stylesheet">
 <script>/* force fresh load when version changes */
-(function(){var v='v16';if(sessionStorage.getItem('cro-ver')!==v){sessionStorage.setItem('cro-ver',v);if(window.location.href.indexOf('nocache')<0){window.location.replace(window.location.href+(window.location.href.indexOf('?')>=0?'&':'?')+'nocache='+v);}}})();
+(function(){var v='v17';if(sessionStorage.getItem('cro-ver')!==v){sessionStorage.setItem('cro-ver',v);if(window.location.href.indexOf('nocache')<0){window.location.replace(window.location.href+(window.location.href.indexOf('?')>=0?'&':'?')+'nocache='+v);}}})();
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
@@ -338,8 +338,40 @@ function extractContent(html){
   return out;
 }
 
+async function fetchViaJina(url){
+  try{
+    var ctrl=new AbortController();
+    var t=setTimeout(function(){ctrl.abort();},12000);
+    var r=await fetch('https://r.jina.ai/'+url,{
+      signal:ctrl.signal,
+      headers:{'Accept':'text/plain','X-Return-Format':'text'}
+    });
+    clearTimeout(t);
+    if(!r.ok) return '';
+    var text=await r.text();
+    return (text&&text.length>500)?text:'';
+  }catch(e){ return ''; }
+}
+
 async function fetchPageContent(url){
   var base=url.replace(/^(https?:\/\/[^/]+).*/,'$1');
+
+  /* Strategie 1: Jina AI Reader — rendert JS, omzeilt Cloudflare */
+  var jinaText=await fetchViaJina(url);
+  if(jinaText){
+    /* probeer ook de aanbodpagina via Jina als die gelinkt is */
+    var subM=jinaText.match(/\(https?:\/\/[^)]*\/(aanbod|woningen|beschikbaar|appartementen|plattegrond)[^)]*\)/gi);
+    if(subM&&subM.length){
+      var subUrl=subM[0].replace(/^\(|\)$/g,'');
+      document.getElementById('stRow').innerHTML='<div class="dot"></div><span>Aanbodpagina ophalen…</span>';
+      var sub2=await fetchViaJina(subUrl);
+      if(sub2) jinaText+='\n\n=== AANBODPAGINA ===\n'+sub2.substring(0,5000);
+    }
+    return jinaText.substring(0,14000);
+  }
+
+  /* Strategie 2: raw HTML via proxy-keten */
+  document.getElementById('stRow').innerHTML='<div class="dot"></div><span>Pagina ophalen via proxy…</span>';
   var html=await fetchRawHtml(url);
   if(!html) return '';
   var content=extractContent(html);
