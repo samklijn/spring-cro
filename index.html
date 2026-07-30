@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;600;700;800&display=swap" rel="stylesheet">
 <script>/* force fresh load when version changes */
-(function(){var v='v8';if(sessionStorage.getItem('cro-ver')!==v){sessionStorage.setItem('cro-ver',v);if(window.location.href.indexOf('nocache')<0){window.location.replace(window.location.href+(window.location.href.indexOf('?')>=0?'&':'?')+'nocache='+v);}}})();
+(function(){var v='v9';if(sessionStorage.getItem('cro-ver')!==v){sessionStorage.setItem('cro-ver',v);if(window.location.href.indexOf('nocache')<0){window.location.replace(window.location.href+(window.location.href.indexOf('?')>=0?'&':'?')+'nocache='+v);}}})();
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <style>
@@ -138,9 +138,10 @@ h1 em{font-style:normal;color:var(--gl)}
 
 footer{text-align:center;font-size:10.5px;color:var(--koud);padding:20px;border-top:1px solid var(--line);letter-spacing:.06em;text-transform:uppercase;margin-top:auto}
 
-/* PDF ELEMENT — hidden, rendered off-screen by html2pdf */
+/* PDF ELEMENT — fixed in viewport but invisible */
 #pdf-output{
-  position:absolute;left:-9999px;top:0;
+  position:fixed;top:0;left:0;
+  opacity:0;pointer-events:none;z-index:-1;
   width:794px;background:#0c0c0c;
   font-family:"Raleway",system-ui,sans-serif;
   color:#ffffff;line-height:1.5;
@@ -234,7 +235,7 @@ footer{text-align:center;font-size:10.5px;color:var(--koud);padding:20px;border-
 var KEY_STORE = 'spring_groq_key';
 var PROXY     = 'https://corsproxy.io/?';
 var GROQ_URL  = 'https://api.groq.com/openai/v1/chat/completions';
-var MODEL     = 'llama-3.1-8b-instant';
+var MODEL     = 'llama-3.3-70b-versatile';
 var _scanData = null;
 
 window.addEventListener('DOMContentLoaded', function() {
@@ -292,7 +293,7 @@ async function doScan(){
           {role:'user',content:buildPrompt(url,'')}
         ],
         response_format:{type:'json_object'},
-        max_tokens:1000,
+        max_tokens:2000,
         temperature:0.2
       }),
       signal:groqCtrl.signal
@@ -480,13 +481,15 @@ function downloadPdf(){
     +'</div>';
 
   var el=document.getElementById('pdf-output');
+  el.style.opacity='1';
   html2pdf().set({
     margin:0,
     filename:'CRO-scan-'+domain+'.pdf',
     image:{type:'jpeg',quality:0.95},
-    html2canvas:{scale:2,useCORS:true,backgroundColor:'#0c0c0c'},
+    html2canvas:{scale:2,useCORS:true,backgroundColor:'#0c0c0c',logging:false},
     jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}
   }).from(el).save().then(function(){
+    el.style.opacity='0';
     btn.disabled=false;
     btn.innerHTML='&#8595; Download PDF';
   });
