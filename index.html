@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;600;700;800&display=swap" rel="stylesheet">
 <script>/* force fresh load when version changes */
-(function(){var v='v14';if(sessionStorage.getItem('cro-ver')!==v){sessionStorage.setItem('cro-ver',v);if(window.location.href.indexOf('nocache')<0){window.location.replace(window.location.href+(window.location.href.indexOf('?')>=0?'&':'?')+'nocache='+v);}}})();
+(function(){var v='v15';if(sessionStorage.getItem('cro-ver')!==v){sessionStorage.setItem('cro-ver',v);if(window.location.href.indexOf('nocache')<0){window.location.replace(window.location.href+(window.location.href.indexOf('?')>=0?'&':'?')+'nocache='+v);}}})();
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
@@ -278,21 +278,75 @@ function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
 function clr(p){ return p>=.7?'good':p>=.45?'mid':'low'; }
 function barClr(p){ return p>=.7?'#89B647':p>=.45?'#d4a832':'#d9713e'; }
 
-async function fetchPageContent(url){
+async function fetchRawHtml(url){
   try{
     var ctrl=new AbortController();
-    var t=setTimeout(function(){ctrl.abort();},8000);
+    var t=setTimeout(function(){ctrl.abort();},7000);
     var r=await fetch(PROXY+url,{signal:ctrl.signal});
     clearTimeout(t);
     if(!r.ok) return '';
-    var html=await r.text();
-    html=html.replace(/<script[\s\S]*?<\/script>/gi,'')
-             .replace(/<style[\s\S]*?<\/style>/gi,'')
-             .replace(/<svg[\s\S]*?<\/svg>/gi,'')
-             .replace(/<!--[\s\S]*?-->/g,'')
-             .replace(/<[^>]+>/g,' ');
-    return html.replace(/\s+/g,' ').trim().substring(0,7000);
+    return await r.text();
   }catch(e){ return ''; }
+}
+
+function extractContent(html){
+  var out='';
+  var tm=html.match(/<title[^>]*>([^<]+)<\/title>/i);
+  if(tm) out+='TITEL: '+tm[1].trim()+'\n';
+  var mm=html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']{5,})["']/i)
+           ||html.match(/<meta[^>]+content=["']([^"']{5,})["'][^>]+name=["']description["']/i);
+  if(mm) out+='DESCRIPTION: '+mm[1].trim()+'\n';
+  html.replace(/<h([1-4])[^>]*>([\s\S]*?)<\/h\1>/gi,function(_,l,t){
+    var txt=t.replace(/<[^>]+>/g,'').replace(/\s+/g,' ').trim();
+    if(txt) out+='H'+l+': '+txt+'\n';
+  });
+  var navM=html.match(/<nav[\s\S]*?<\/nav>/gi)||[];
+  navM.forEach(function(nav){
+    nav.replace(/<a[^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi,function(_,h,t){
+      var txt=t.replace(/<[^>]+>/g,'').replace(/\s+/g,' ').trim();
+      if(txt&&txt.length>1) out+='NAV: '+txt+' ('+h+')\n';
+    });
+  });
+  var links=[];
+  html.replace(/href=["']([^"'#?][^"']*?)["']/gi,function(_,h){
+    if(h.startsWith('/')||h.startsWith('http')) links.push(h);
+  });
+  links=[...new Set(links)].slice(0,60);
+  if(links.length) out+='ALLE LINKS: '+links.join(' | ')+'\n';
+  html.replace(/<button[^>]*>([\s\S]*?)<\/button>/gi,function(_,t){
+    var txt=t.replace(/<[^>]+>/g,'').replace(/\s+/g,' ').trim();
+    if(txt&&txt.length>2&&txt.length<120) out+='BTN: '+txt+'\n';
+  });
+  var text=html
+    .replace(/<script[\s\S]*?<\/script>/gi,'')
+    .replace(/<style[\s\S]*?<\/style>/gi,'')
+    .replace(/<svg[\s\S]*?<\/svg>/gi,'')
+    .replace(/<!--[\s\S]*?-->/g,'')
+    .replace(/<[^>]+>/g,' ')
+    .replace(/\s+/g,' ').trim();
+  out+='\nTEKST:\n'+text.substring(0,6000);
+  return out;
+}
+
+async function fetchPageContent(url){
+  var base=url.replace(/^(https?:\/\/[^/]+).*/,'$1');
+  var html=await fetchRawHtml(url);
+  if(!html) return '';
+  var content=extractContent(html);
+  var subLinks=[];
+  html.replace(/href=["']([^"'#?]+)["']/gi,function(_,h){
+    if(/\/(aanbod|woningen|beschikbaar|huizen|appartementen|woning-?types?|bouwnummers?|units?|plattegrond)/i.test(h)){
+      var full=h.startsWith('http')?h:(h.startsWith('/')?base+h:base+'/'+h);
+      subLinks.push(full);
+    }
+  });
+  subLinks=[...new Set(subLinks)];
+  if(subLinks.length){
+    document.getElementById('stRow').innerHTML='<div class="dot"></div><span>Aanbodpagina ophalen…</span>';
+    var subHtml=await fetchRawHtml(subLinks[0]);
+    if(subHtml) content+='\n\n=== AANBODPAGINA ('+subLinks[0]+') ===\n'+extractContent(subHtml);
+  }
+  return content.substring(0,14000);
 }
 
 async function doScan(){
@@ -376,7 +430,7 @@ function buildPrompt(url, pageContent){
     ?'\n\n--- PAGINATEKST (gebruik dit als primaire bron voor de beoordeling) ---\n'+pageContent+'\n--- EINDE PAGINATEKST ---'
     :'\n\n(Paginatekst kon niet worden opgehaald — baseer analyse op URL en domeinnaam.)';
 
-  return 'Analyseer deze nieuwbouw projectwebsite als CRO-expert. Wees kritisch en concreet — baseer je uitsluitend op de paginatekst hieronder.'+contentBlock+'\n\nURL: '+url+'\n\nScoringsregel per vraag: Ja=2pt, Gedeeltelijk=1pt, Nee=0pt.\nCategoriescore = (som antwoordpunten ÷ max raw) × weging. Rond af op 1 decimaal.\nTotal = som van alle categoriescores (0-100).\n\nVragen per categorie:\n'+catLines+'\n\nGeef ALLEEN dit JSON-object, geen andere tekst:\n{"total":<0-100>,"categories":['+schemaCategories+'],"top3":["concrete aanbeveling 1","concrete aanbeveling 2","concrete aanbeveling 3"]}';
+  return 'Analyseer deze nieuwbouw projectwebsite als CRO-expert. Baseer je UITSLUITEND op de onderstaande paginainhoud — geen aannames.'+contentBlock+'\n\nURL: '+url+'\n\nBELANGRIJKE LEESREGELS:\n- De site is mogelijk gebouwd in React/Vue (SPA). Inhoud die je NIET in de tekst ziet maar wel in ALLE LINKS of NAV staat (bijv. /woningen, /aanbod, /plattegronden, /beschikbaarheid) IS aanwezig op de site — antwoord dan Ja of Gedeeltelijk, niet Nee.\n- Kijk ook naar BTN: regels voor aanwezige CTA-teksten.\n- Kijk naar H1/H2/H3 koppen voor structuur en inhoud.\n- Als een AANBODPAGINA beschikbaar is, gebruik die voor vragen over woningaanbod en plattegronden.\n\nScoringsregel per vraag: Ja=2pt, Gedeeltelijk=1pt, Nee=0pt.\nCategoriescore = (som antwoordpunten ÷ max raw) × weging. Rond af op 1 decimaal.\nTotal = som van alle categoriescores (0-100).\n\nVragen per categorie:\n'+catLines+'\n\nGeef ALLEEN dit JSON-object, geen andere tekst:\n{"total":<0-100>,"categories":['+schemaCategories+'],"top3":["concrete aanbeveling 1","concrete aanbeveling 2","concrete aanbeveling 3"]}';
 }
 
 function renderResults(d){
