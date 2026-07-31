@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;600;700;800&display=swap" rel="stylesheet">
 <script>/* force fresh load when version changes */
-(function(){var v='v23';if(sessionStorage.getItem('cro-ver')!==v){sessionStorage.setItem('cro-ver',v);if(window.location.href.indexOf('nocache')<0){window.location.replace(window.location.href+(window.location.href.indexOf('?')>=0?'&':'?')+'nocache='+v);}}})();
+(function(){var v='v24';if(sessionStorage.getItem('cro-ver')!==v){sessionStorage.setItem('cro-ver',v);if(window.location.href.indexOf('nocache')<0){window.location.replace(window.location.href+(window.location.href.indexOf('?')>=0?'&':'?')+'nocache='+v);}}})();
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
@@ -353,20 +353,36 @@ function extractContent(html){
     .replace(/<!--[\s\S]*?-->/g,'')
     .replace(/<[^>]+>/g,' ')
     .replace(/\s+/g,' ').trim();
-  out+='\nTEKST:\n'+text.substring(0,6000);
+  out+='\nTEKST:\n'+text.substring(0,9000);
   return out;
 }
 
-async function fetchViaJina(url){
+async function fetchViaJina(url,retry){
   try{
     var ctrl=new AbortController();
-    var t=setTimeout(function(){ctrl.abort();},12000);
-    var r=await fetch('https://r.jina.ai/'+url,{signal:ctrl.signal,headers:{'Accept':'text/plain','X-Return-Format':'text'}});
+    var t=setTimeout(function(){ctrl.abort();},25000);
+    var r=await fetch('https://r.jina.ai/'+url,{signal:ctrl.signal,headers:{
+      'Accept':'text/plain',
+      'X-Return-Format':'text',
+      'X-No-Cache':'true',
+      'X-With-Links-Summary':'true'
+    }});
     clearTimeout(t);
     if(!r.ok) return '';
     var text=await r.text();
-    return (text&&text.length>500)?text:'';
-  }catch(e){ return ''; }
+    if(text&&text.length>500) return text;
+    if(!retry){
+      await new Promise(function(res){setTimeout(res,1500);});
+      return fetchViaJina(url,true);
+    }
+    return '';
+  }catch(e){
+    if(!retry){
+      await new Promise(function(res){setTimeout(res,2000);});
+      return fetchViaJina(url,true);
+    }
+    return '';
+  }
 }
 
 function extractTechBlock(html,url){
@@ -425,9 +441,11 @@ function detectSubpages(text,base){
       var seg=key.replace(base,'').replace(/^\//,'').split('/')[0];
       lbl=seg.toUpperCase().replace(/-/g,' ').substring(0,18)||'PAGINA';
     }
-    result.push({url:key,label:lbl,jina:true});
+    var prio=lbl==='AANBOD'?0:lbl==='CONTACT'?1:lbl==='FAQ'?2:lbl==='DOWNLOADS'?3:lbl==='LOCATIE'?4:lbl==='PLATTEGRONDEN'?5:6;
+    result.push({url:key,label:lbl,prio:prio,jina:true});
   });
-  return result.slice(0,8);
+  result.sort(function(a,b){return a.prio-b.prio;});
+  return result.slice(0,10);
 }
 
 async function fetchPageContent(url){
@@ -440,9 +458,16 @@ async function fetchPageContent(url){
   if(jinaText) jinaText=cleanJina(jinaText);
 
   var techBlock=extractTechBlock(rawHtml,url);
+
+  if(!jinaText&&rawHtml){
+    stRow.innerHTML='<div class="dot"></div><span>Jina opnieuw proberen…</span>';
+    jinaText=await fetchViaJina(url);
+    if(jinaText) jinaText=cleanJina(jinaText);
+  }
+
   var mainContent=jinaText||(rawHtml?extractContent(rawHtml):'');
 
-  var homeContent=mainContent.substring(0,6000);
+  var homeContent=mainContent.substring(0,10000);
   var subContent='';
   var subpages=detectSubpages((jinaText||'')+(rawHtml||''),base);
   if(subpages.length){
@@ -457,14 +482,14 @@ async function fetchPageContent(url){
     var loaded=[];
     subResults.forEach(function(r){
       if(!r.h||r.h.length<200) return;
-      var txt=r.jina?r.h.substring(0,1600):extractContent(r.h).substring(0,1600);
+      var txt=r.jina?r.h.substring(0,3000):extractContent(r.h).substring(0,3000);
       subContent+='\n\n=== '+r.s.label+' ('+r.s.url+') ===\n'+txt;
       loaded.push(r.s.label);
       _scannedPages.push(r.s.label);
     });
     if(loaded.length) stRow.innerHTML='<div class="dot"></div><span>Geladen: '+loaded.join(', ')+'</span>';
   }
-  return (techBlock+homeContent+subContent).substring(0,20000);
+  return (techBlock+homeContent+subContent).substring(0,30000);
 }
 
 async function doScan(){
@@ -504,7 +529,7 @@ async function doScan(){
     },5000);
 
     var groqCtrl=new AbortController();
-    var groqTimer=setTimeout(function(){groqCtrl.abort();},45000);
+    var groqTimer=setTimeout(function(){groqCtrl.abort();},65000);
     var gr=await fetch(GROQ_URL,{
       method:'POST',
       headers:{'Authorization':'Bearer '+apiKey,'Content-Type':'application/json'},
@@ -515,7 +540,7 @@ async function doScan(){
           {role:'user',content:buildPrompt(url,pageContent)}
         ],
         response_format:{type:'json_object'},
-        max_tokens:4000,
+        max_tokens:5000,
         temperature:0.2
       }),
       signal:groqCtrl.signal
@@ -566,22 +591,23 @@ function buildPrompt(url, pageContent){
     ?'\n\n--- PAGINATEKST ---\n'+pageContent+'\n--- EINDE ---'
     :'\n\n(Pagina niet bereikbaar — gebruik URL en domeinnaam als bron.)';
 
-  return 'Je bent een CRO-expert voor Nederlandse nieuwbouw projectwebsites. Lees de paginatekst hieronder WOORD VOOR WOORD. Geen aannames — alleen wat letterlijk staat.'+contentBlock+'\n\nURL: '+url+'\n\n'+
-    'SCORINGSREGELS (streng):\n'+
-    '- Ja = element staat EXPLICIET en volledig in de gelezen tekst\n'+
-    '- Gedeeltelijk = aanwezig maar beperkt, vaag, of alleen als link/nav zonder inhoud\n'+
-    '- Nee = nergens in de tekst te vinden\n'+
-    '- SPA-uitzondering: staat een pagina in NAV of LINKS (/woningen, /aanbod, /plattegronden) = Gedeeltelijk\n'+
-    '- TECHNISCHE FEITEN (=== TECHNISCHE FEITEN ===): gebruik die als definitieve antwoorden voor categorie 9 en 10 — NIET je eigen gissing\n'+
+  return 'Je bent een CRO-expert voor Nederlandse nieuwbouw projectwebsites. Analyseer de paginatekst hieronder grondig.'+contentBlock+'\n\nURL: '+url+'\n\n'+
+    'SCORINGSREGELS:\n'+
+    '- Ja = element staat EXPLICIET en volledig aanwezig in de gelezen tekst of op een geladen subpagina\n'+
+    '- Gedeeltelijk = aanwezig maar beperkt/vaag, OR: pagina/sectie is aantoonbaar bereikbaar via NAV/LINKS maar inhoud niet geladen\n'+
+    '- Nee = nergens in tekst of links te vinden\n'+
+    '- SPA/React-sites: als een pagina zichtbaar is in NAV, LINKS of als knop (bijv. /woningen, /aanbod, /plattegronden, /contact), tel dit als Gedeeltelijk voor de bijbehorende vragen — de content laadt in de browser maar is hier niet uitleesbaar\n'+
+    '- LINKS-SUMMARY sectie: als Jina een "Links/Buttons" sectie genereert, gebruik die voor navigatiedetectie\n'+
+    '- TECHNISCHE FEITEN (=== TECHNISCHE FEITEN ===): gebruik die als definitieve antwoorden voor categorie 9 en 10 — overschrijf nooit technische feiten met aannames\n'+
     '- Puntentelling: Ja=2pt, Gedeeltelijk=1pt, Nee=0pt\n'+
-    '- Categoriescore = (behaalde punten / max raw van die categorie) × weging, 1 decimaal\n'+
-    '- Total = exacte som van alle 10 categoriescores\n\n'+
+    '- Categoriescore = (behaalde punten / max raw van die categorie) × weging, afgerond op 1 decimaal\n'+
+    '- Total = exacte som van alle 10 categoriescores (niet afronden tot 100, echte som)\n\n'+
     'VELDREGELS:\n'+
     '- answers[]: Ja/Gedeeltelijk/Nee per vraag, in volgorde\n'+
     '- improve[]: 1-3 punten ALLEEN voor Nee/Gedeeltelijk. Formaat: "[pagina/sectie]: [concreet ontbrekend element] — [exacte actie met voorbeeld]"\n'+
     '  Goede voorbeelden: "Homepage hero: startprijs ontbreekt — voeg \'Appartementen vanaf €325.000\' toe direct onder headline" | "Aanbodpagina: geen filteropties — voeg prijs+kamers-filter toe boven het grid" | "Footer: makelaarsnaam ontbreekt — toon naam, telefoonnummer en KvK"\n'+
     '  VERBODEN: vage formuleringen als "voeg meer informatie toe", "verbeter de navigatie", "maak CTA duidelijker" — altijd specifiek element + exacte locatie + concreet voorbeeld\n'+
-    '- evidence: citeer een LETTERLIJKE zin of kop uit de tekst als bewijs. Bij ontbrekend element: beschrijf wat er wél staat op die plek.\n\n'+
+    '- evidence: citeer een LETTERLIJKE zin, kop, link of nav-item als bewijs. Bij ontbrekend element: beschrijf wat er wél op die plek staat.\n\n'+
     'Vragen:\n'+catLines+'\n\n'+
     'Geef ALLEEN dit JSON:\n'+
     '{"total":<0-100>,"categories":['+schemaCategories+'],"top3":["[pagina/element]: wat ontbreekt — concrete actie","idem","idem"]}';
