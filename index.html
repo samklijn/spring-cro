@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;600;700;800&display=swap" rel="stylesheet">
 <script>/* force fresh load when version changes */
-(function(){var v='v26';if(sessionStorage.getItem('cro-ver')!==v){sessionStorage.setItem('cro-ver',v);if(window.location.href.indexOf('nocache')<0){window.location.replace(window.location.href+(window.location.href.indexOf('?')>=0?'&':'?')+'nocache='+v);}}})();
+(function(){var v='v27';if(sessionStorage.getItem('cro-ver')!==v){sessionStorage.setItem('cro-ver',v);if(window.location.href.indexOf('nocache')<0){window.location.replace(window.location.href+(window.location.href.indexOf('?')>=0?'&':'?')+'nocache='+v);}}})();
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
@@ -586,6 +586,22 @@ async function fetchPageContent(url){
   return (techBlock+homeContent+subContent).substring(0,80000);
 }
 
+function recalcScores(result){
+  if(!result||!result.categories) return result;
+  var pts={'Ja':2,'Gedeeltelijk':1,'Nee':0};
+  var total=0;
+  result.categories.forEach(function(cat,i){
+    var c=CATS[i];
+    if(!c||!cat.answers) return;
+    var raw=0;
+    cat.answers.forEach(function(a){ raw+=pts[a]||0; });
+    cat.score=Math.round((raw/c.mr)*c.w*10)/10;
+    total+=cat.score;
+  });
+  result.total=Math.round(total*10)/10;
+  return result;
+}
+
 async function doScan(){
   var prov0=localStorage.getItem(KEY_PROVIDER)||'openai';
   var apiKey=prov0==='openai'?localStorage.getItem(KEY_OPENAI):localStorage.getItem(KEY_STORE);
@@ -654,7 +670,7 @@ async function doScan(){
       throw new Error(msg);
     }
     var gd=await gr.json();
-    var result=JSON.parse(gd.choices[0].message.content);
+    var result=recalcScores(JSON.parse(gd.choices[0].message.content));
     result.url=url;
     _scanData=result;
     bar.classList.remove('show');
