@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;600;700;800&display=swap" rel="stylesheet">
 <script>/* force fresh load when version changes */
-(function(){var v='v27';if(sessionStorage.getItem('cro-ver')!==v){sessionStorage.setItem('cro-ver',v);if(window.location.href.indexOf('nocache')<0){window.location.replace(window.location.href+(window.location.href.indexOf('?')>=0?'&':'?')+'nocache='+v);}}})();
+(function(){var v='v28';if(sessionStorage.getItem('cro-ver')!==v){sessionStorage.setItem('cro-ver',v);if(window.location.href.indexOf('nocache')<0){window.location.replace(window.location.href+(window.location.href.indexOf('?')>=0?'&':'?')+'nocache='+v);}}})();
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
@@ -185,6 +185,8 @@ footer{text-align:center;font-size:10.5px;color:var(--koud);padding:20px;border-
       <button class="prov-btn" id="provGroq" onclick="switchProv('groq')">Groq</button>
     </div>
     <p id="provDesc">Maak een API-sleutel aan op <a class="modal-link" href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com</a> &rarr; API keys &rarr; Create new secret key.</p>
+    <label class="modal-lbl">Model</label>
+    <select class="modal-input" id="modelSelect" style="cursor:pointer"></select>
     <label class="modal-lbl" for="apiKeyInput" id="provLbl">OpenAI API-sleutel</label>
     <input class="modal-input" id="apiKeyInput" type="password" placeholder="sk-..." autocomplete="off" spellcheck="false"/>
     <button class="modal-btn" onclick="saveKey()">Opslaan &amp; doorgaan</button>
@@ -260,9 +262,25 @@ var PROXIES   = [
   {base:'https://api.codetabs.com/v1/proxy?quest=', enc:false,json:false}
 ];
 var PROVIDERS = {
-  openai: {url:'https://api.openai.com/v1/chat/completions', model:'gpt-4o-mini',   placeholder:'sk-...'},
-  groq:   {url:'https://api.groq.com/openai/v1/chat/completions', model:'llama-3.3-70b-versatile', placeholder:'gsk_...'}
+  openai: {
+    url:'https://api.openai.com/v1/chat/completions',
+    placeholder:'sk-...',
+    models:[
+      {id:'gpt-4o-mini',   label:'GPT-4o mini — aanbevolen (snel & goedkoop)'},
+      {id:'gpt-4o',        label:'GPT-4o — krachtiger, 10× duurder'},
+      {id:'o4-mini',       label:'o4-mini — redeneermodel'}
+    ]
+  },
+  groq: {
+    url:'https://api.groq.com/openai/v1/chat/completions',
+    placeholder:'gsk_...',
+    models:[
+      {id:'llama-3.3-70b-versatile', label:'Llama 3.3 70B — aanbevolen'},
+      {id:'llama-3.1-8b-instant',    label:'Llama 3.1 8B — sneller, minder nauwkeurig'}
+    ]
+  }
 };
+var KEY_MODEL   = 'spring_ai_model';
 var _activeProv = 'openai';
 var _scanData = null;
 var _scannedPages = [];
@@ -323,13 +341,21 @@ function switchProv(p, silent){
   } else {
     document.getElementById('provDesc').innerHTML='Maak een API-sleutel aan op <a class="modal-link" href="https://console.groq.com" target="_blank">console.groq.com</a> &rarr; API Keys &rarr; Create API key.';
   }
+  var sel=document.getElementById('modelSelect');
+  var savedModel=localStorage.getItem(KEY_MODEL);
+  sel.innerHTML=cfg.models.map(function(m){
+    var selected=(m.id===savedModel)?'selected':'';
+    return '<option value="'+m.id+'" '+selected+'>'+m.label+'</option>';
+  }).join('');
   if(!silent) document.getElementById('apiKeyInput').value='';
 }
 
 function saveKey(){
   var k=document.getElementById('apiKeyInput').value.trim();
   if(!k){ alert('Voer een API-sleutel in.'); return; }
+  var model=document.getElementById('modelSelect').value;
   localStorage.setItem(KEY_PROVIDER,_activeProv);
+  localStorage.setItem(KEY_MODEL,model);
   localStorage.setItem(_activeProv==='openai'?KEY_OPENAI:KEY_STORE,k);
   document.getElementById('setupModal').style.display='none';
 }
@@ -641,13 +667,15 @@ async function doScan(){
 
     var prov=localStorage.getItem(KEY_PROVIDER)||_activeProv||'openai';
     var cfg=PROVIDERS[prov]||PROVIDERS.openai;
+    var savedModel=localStorage.getItem(KEY_MODEL);
+    var useModel=savedModel||(cfg.models&&cfg.models[0].id)||'gpt-4o-mini';
     var groqCtrl=new AbortController();
     var groqTimer=setTimeout(function(){groqCtrl.abort();},65000);
     var gr=await fetch(cfg.url,{
       method:'POST',
       headers:{'Authorization':'Bearer '+apiKey,'Content-Type':'application/json'},
       body:JSON.stringify({
-        model:cfg.model,
+        model:useModel,
         messages:[
           {role:'system',content:'Je bent een CRO-expert voor Nederlandse nieuwbouw projectwebsites. Antwoord altijd in valide JSON, zonder extra tekst.'},
           {role:'user',content:buildPrompt(url,pageContent)}
