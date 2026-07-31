@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;600;700;800&display=swap" rel="stylesheet">
 <script>/* force fresh load when version changes */
-(function(){var v='v22';if(sessionStorage.getItem('cro-ver')!==v){sessionStorage.setItem('cro-ver',v);if(window.location.href.indexOf('nocache')<0){window.location.replace(window.location.href+(window.location.href.indexOf('?')>=0?'&':'?')+'nocache='+v);}}})();
+(function(){var v='v23';if(sessionStorage.getItem('cro-ver')!==v){sessionStorage.setItem('cro-ver',v);if(window.location.href.indexOf('nocache')<0){window.location.replace(window.location.href+(window.location.href.indexOf('?')>=0?'&':'?')+'nocache='+v);}}})();
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
@@ -1011,6 +1011,20 @@ function restoreScan(i){
   document.getElementById('hero').style.paddingBottom='28px';
   renderResults(s.data);
 }
+
+// Auto-start from ?scan=URL or ?url=URL parameter (vanuit Acquisitie dashboard)
+(function(){
+  try{
+    var params=new URLSearchParams(window.location.search);
+    var autoUrl=params.get('scan')||params.get('url');
+    if(autoUrl){
+      window.addEventListener('load',function(){
+        document.getElementById('urlIn').value=autoUrl;
+        setTimeout(doScan,400);
+      });
+    }
+  }catch(e){}
+})();
 </script>
 </body>
 </html>
