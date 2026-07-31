@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;600;700;800&display=swap" rel="stylesheet">
 <script>/* force fresh load when version changes */
-(function(){var v='v24';if(sessionStorage.getItem('cro-ver')!==v){sessionStorage.setItem('cro-ver',v);if(window.location.href.indexOf('nocache')<0){window.location.replace(window.location.href+(window.location.href.indexOf('?')>=0?'&':'?')+'nocache='+v);}}})();
+(function(){var v='v25';if(sessionStorage.getItem('cro-ver')!==v){sessionStorage.setItem('cro-ver',v);if(window.location.href.indexOf('nocache')<0){window.location.replace(window.location.href+(window.location.href.indexOf('?')>=0?'&':'?')+'nocache='+v);}}})();
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
@@ -445,16 +445,36 @@ function detectSubpages(text,base){
     result.push({url:key,label:lbl,prio:prio,jina:true});
   });
   result.sort(function(a,b){return a.prio-b.prio;});
-  return result.slice(0,10);
+  return result;
+}
+
+async function fetchSitemapUrls(base){
+  var urls=[];
+  var candidates=[base+'/sitemap.xml',base+'/sitemap_index.xml',base+'/sitemap/'];
+  for(var i=0;i<candidates.length;i++){
+    var xml=await fetchRawHtml(candidates[i]);
+    if(!xml||xml.length<80) continue;
+    xml.replace(/<loc[^>]*>\s*([^\s<]+)\s*<\/loc>/gi,function(_,u){
+      u=u.trim();
+      if(u.startsWith(base)&&!urls.includes(u)) urls.push(u);
+    });
+    if(urls.length>3) break;
+  }
+  return urls;
 }
 
 async function fetchPageContent(url){
   _scannedPages=[url];
   var base=url.replace(/^(https?:\/\/[^/]+).*/,'$1');
   var stRow=document.getElementById('stRow');
+  var homeKey=url.split('?')[0].split('#')[0].replace(/\/$/,'');
 
-  stRow.innerHTML='<div class="dot"></div><span>Pagina ophalen…</span>';
-  var [rawHtml,jinaText]=await Promise.all([fetchRawHtml(url),fetchViaJina(url)]);
+  stRow.innerHTML='<div class="dot"></div><span>Homepage + sitemap ophalen…</span>';
+  var [rawHtml,jinaText,sitemapUrls]=await Promise.all([
+    fetchRawHtml(url),
+    fetchViaJina(url),
+    fetchSitemapUrls(base)
+  ]);
   if(jinaText) jinaText=cleanJina(jinaText);
 
   var techBlock=extractTechBlock(rawHtml,url);
@@ -466,15 +486,52 @@ async function fetchPageContent(url){
   }
 
   var mainContent=jinaText||(rawHtml?extractContent(rawHtml):'');
+  var homeContent=mainContent.substring(0,12000);
 
-  var homeContent=mainContent.substring(0,10000);
+  // Verzamel pagina's via linkdetectie + sitemap samen
+  var linkPages=detectSubpages((jinaText||'')+(rawHtml||''),base);
+  var seenUrls=new Set([homeKey,homeKey+'/']);
+  linkPages.forEach(function(s){seenUrls.add(s.url);});
+
+  var SKIP_EXT=/\.(pdf|jpg|jpeg|png|gif|svg|css|js|ico|woff2?|mp4|zip|xml)($|\?)/i;
+  var SKIP_PATH=/\/(login|logout|admin|wp-admin|wp-json|sitemap|feed|rss|cart|checkout|zoeken|search|404|privacy|cookie|disclaimer)/i;
+  var LMAP2=[
+    [/\/(aanbod|woningen|beschikbaar|appartementen|bouwnummer|units?)/i,'AANBOD'],
+    [/\/plattegrond/i,'PLATTEGRONDEN'],
+    [/\/contact/i,'CONTACT'],
+    [/\/(faq|vragen)/i,'FAQ'],
+    [/\/(downloads?|brochure)/i,'DOWNLOADS'],
+    [/\/(locatie|omgeving|buurt|ligging)/i,'LOCATIE'],
+    [/\/(sfeer|impressie|gallery|galerij)/i,'SFEER'],
+    [/\/(duurzaamheid|energie|groen)/i,'DUURZAAMHEID'],
+    [/\/(over|project-info|het-project|ontwikkelaar)/i,'OVER'],
+    [/\/(nieuws|blog|update|actueel)/i,'NIEUWS'],
+  ];
+  sitemapUrls.forEach(function(u){
+    var key=u.split('?')[0].split('#')[0].replace(/\/$/,'');
+    if(seenUrls.has(key)||seenUrls.has(key+'/')||SKIP_EXT.test(key)||SKIP_PATH.test(key)) return;
+    seenUrls.add(key);
+    var lbl='';
+    LMAP2.forEach(function(m){if(!lbl&&m[0].test(key)) lbl=m[1];});
+    if(!lbl){
+      var seg=key.replace(base,'').replace(/^\//,'').split('/')[0];
+      lbl=seg.toUpperCase().replace(/-/g,' ').substring(0,18)||'PAGINA';
+    }
+    var prio=lbl==='AANBOD'?0:lbl==='CONTACT'?1:lbl==='FAQ'?2:lbl==='DOWNLOADS'?3:lbl==='LOCATIE'?4:lbl==='PLATTEGRONDEN'?5:6;
+    linkPages.push({url:key,label:lbl,prio:prio});
+  });
+
+  linkPages.sort(function(a,b){return a.prio-b.prio;});
+  var allPages=linkPages.slice(0,20);
+
   var subContent='';
-  var subpages=detectSubpages((jinaText||'')+(rawHtml||''),base);
-  if(subpages.length){
-    var lbl=subpages.map(function(s){return s.label.toLowerCase();}).join(', ');
-    stRow.innerHTML='<div class="dot"></div><span>Subpagina\'s ophalen: '+lbl+'…</span>';
-    var subResults=await Promise.all(subpages.map(function(s){
+  if(allPages.length){
+    var done=0;
+    stRow.innerHTML='<div class="dot"></div><span>0/'+allPages.length+' pagina\'s ophalen…</span>';
+    var subResults=await Promise.all(allPages.map(function(s){
       return fetchViaJina(s.url).then(function(h){
+        done++;
+        stRow.innerHTML='<div class="dot"></div><span>'+done+'/'+allPages.length+' pagina\'s geladen…</span>';
         if(h&&h.length>200) return {s:s,h:cleanJina(h),jina:true};
         return fetchRawHtml(s.url).then(function(r){return{s:s,h:r,jina:false};});
       });
@@ -482,14 +539,14 @@ async function fetchPageContent(url){
     var loaded=[];
     subResults.forEach(function(r){
       if(!r.h||r.h.length<200) return;
-      var txt=r.jina?r.h.substring(0,3000):extractContent(r.h).substring(0,3000);
+      var txt=r.jina?r.h.substring(0,5000):extractContent(r.h).substring(0,5000);
       subContent+='\n\n=== '+r.s.label+' ('+r.s.url+') ===\n'+txt;
       loaded.push(r.s.label);
       _scannedPages.push(r.s.label);
     });
     if(loaded.length) stRow.innerHTML='<div class="dot"></div><span>Geladen: '+loaded.join(', ')+'</span>';
   }
-  return (techBlock+homeContent+subContent).substring(0,30000);
+  return (techBlock+homeContent+subContent).substring(0,80000);
 }
 
 async function doScan(){
