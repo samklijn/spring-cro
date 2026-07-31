@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;600;700;800&display=swap" rel="stylesheet">
 <script>/* force fresh load when version changes */
-(function(){var v='v25';if(sessionStorage.getItem('cro-ver')!==v){sessionStorage.setItem('cro-ver',v);if(window.location.href.indexOf('nocache')<0){window.location.replace(window.location.href+(window.location.href.indexOf('?')>=0?'&':'?')+'nocache='+v);}}})();
+(function(){var v='v26';if(sessionStorage.getItem('cro-ver')!==v){sessionStorage.setItem('cro-ver',v);if(window.location.href.indexOf('nocache')<0){window.location.replace(window.location.href+(window.location.href.indexOf('?')>=0?'&':'?')+'nocache='+v);}}})();
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
@@ -43,6 +43,10 @@ body{font-family:var(--fn);background:var(--bg);color:var(--ink);line-height:1.5
 .modal-btn{width:100%;padding:14px;background:var(--g);color:#fff;border:none;border-radius:var(--rsm);font-family:var(--fn);font-size:13px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;transition:background .15s}
 .modal-btn:hover{background:var(--gl)}
 .modal-note{font-size:11.5px;color:var(--koud);margin-top:12px;text-align:center;line-height:1.5}
+.prov-toggle{display:flex;gap:8px;margin-bottom:22px}
+.prov-btn{flex:1;padding:10px;border-radius:var(--rsm);font-family:var(--fn);font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;border:1px solid var(--bd);background:var(--bg);color:var(--muted);transition:all .15s}
+.prov-btn:hover{border-color:var(--g);color:var(--gl)}
+.prov-btn.active{background:var(--g);border-color:var(--g);color:#fff}
 
 /* TOP BAR */
 .top{position:sticky;top:0;z-index:20;background:rgba(12,12,12,.94);backdrop-filter:blur(12px);border-bottom:1px solid var(--line);padding:0 24px;height:54px;display:flex;align-items:center;gap:14px}
@@ -175,10 +179,14 @@ footer{text-align:center;font-size:10.5px;color:var(--koud);padding:20px;border-
       <div class="modal-mark">S</div>
       <div class="modal-brand">Spring Real Estate</div>
     </div>
-    <h2>Groq API-sleutel instellen</h2>
-    <p>Om websites te scannen heb je een gratis Groq API-sleutel nodig. Maak er een aan op <a class="modal-link" href="https://console.groq.com" target="_blank">console.groq.com</a> &rarr; API Keys &rarr; Create API key.</p>
-    <label class="modal-lbl" for="apiKeyInput">Groq API-sleutel</label>
-    <input class="modal-input" id="apiKeyInput" type="password" placeholder="gsk_..." autocomplete="off" spellcheck="false"/>
+    <h2>API-sleutel instellen</h2>
+    <div class="prov-toggle">
+      <button class="prov-btn active" id="provOpenai" onclick="switchProv('openai')">OpenAI</button>
+      <button class="prov-btn" id="provGroq" onclick="switchProv('groq')">Groq</button>
+    </div>
+    <p id="provDesc">Maak een API-sleutel aan op <a class="modal-link" href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com</a> &rarr; API keys &rarr; Create new secret key.</p>
+    <label class="modal-lbl" for="apiKeyInput" id="provLbl">OpenAI API-sleutel</label>
+    <input class="modal-input" id="apiKeyInput" type="password" placeholder="sk-..." autocomplete="off" spellcheck="false"/>
     <button class="modal-btn" onclick="saveKey()">Opslaan &amp; doorgaan</button>
     <div class="modal-note">Sleutel wordt alleen lokaal opgeslagen in jouw browser.</div>
   </div>
@@ -243,14 +251,19 @@ footer{text-align:center;font-size:10.5px;color:var(--koud);padding:20px;border-
 <footer>Spring Real Estate &nbsp;&middot;&nbsp; Projectmarketing &amp; Makelaardij</footer>
 
 <script>
-var KEY_STORE = 'spring_groq_key';
+var KEY_STORE    = 'spring_groq_key';
+var KEY_OPENAI   = 'spring_openai_key';
+var KEY_PROVIDER = 'spring_ai_provider';
 var PROXIES   = [
   {base:'https://corsproxy.io/?',                   enc:false,json:false},
   {base:'https://api.allorigins.win/get?url=',      enc:true, json:true, field:'contents'},
   {base:'https://api.codetabs.com/v1/proxy?quest=', enc:false,json:false}
 ];
-var GROQ_URL  = 'https://api.groq.com/openai/v1/chat/completions';
-var MODEL     = 'llama-3.3-70b-versatile';
+var PROVIDERS = {
+  openai: {url:'https://api.openai.com/v1/chat/completions', model:'gpt-4o-mini',   placeholder:'sk-...'},
+  groq:   {url:'https://api.groq.com/openai/v1/chat/completions', model:'llama-3.3-70b-versatile', placeholder:'gsk_...'}
+};
+var _activeProv = 'openai';
 var _scanData = null;
 var _scannedPages = [];
 
@@ -282,18 +295,42 @@ var CATS = [
 ];
 
 window.addEventListener('DOMContentLoaded', function() {
-  if (!localStorage.getItem(KEY_STORE)) showSetup();
+  var hasSome=localStorage.getItem(KEY_STORE)||localStorage.getItem(KEY_OPENAI);
+  if(!hasSome) showSetup();
+  _activeProv=localStorage.getItem(KEY_PROVIDER)||( localStorage.getItem(KEY_OPENAI)?'openai':'groq');
   document.getElementById('urlIn').addEventListener('keydown', function(e){ if(e.key==='Enter') doScan(); });
   renderDimPills();
   renderHistory();
 });
 
-function showSetup(){ document.getElementById('setupModal').style.display='flex'; }
-function resetKey(){ document.getElementById('apiKeyInput').value=''; showSetup(); }
+function showSetup(){
+  _activeProv=localStorage.getItem(KEY_PROVIDER)||'openai';
+  switchProv(_activeProv,true);
+  document.getElementById('apiKeyInput').value='';
+  document.getElementById('setupModal').style.display='flex';
+}
+function resetKey(){ showSetup(); }
+
+function switchProv(p, silent){
+  _activeProv=p;
+  document.getElementById('provOpenai').classList.toggle('active',p==='openai');
+  document.getElementById('provGroq').classList.toggle('active',p==='groq');
+  var cfg=PROVIDERS[p];
+  document.getElementById('apiKeyInput').placeholder=cfg.placeholder;
+  document.getElementById('provLbl').textContent=(p==='openai'?'OpenAI':'Groq')+' API-sleutel';
+  if(p==='openai'){
+    document.getElementById('provDesc').innerHTML='Maak een API-sleutel aan op <a class="modal-link" href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com</a> &rarr; API keys &rarr; Create new secret key.';
+  } else {
+    document.getElementById('provDesc').innerHTML='Maak een API-sleutel aan op <a class="modal-link" href="https://console.groq.com" target="_blank">console.groq.com</a> &rarr; API Keys &rarr; Create API key.';
+  }
+  if(!silent) document.getElementById('apiKeyInput').value='';
+}
+
 function saveKey(){
   var k=document.getElementById('apiKeyInput').value.trim();
   if(!k){ alert('Voer een API-sleutel in.'); return; }
-  localStorage.setItem(KEY_STORE,k);
+  localStorage.setItem(KEY_PROVIDER,_activeProv);
+  localStorage.setItem(_activeProv==='openai'?KEY_OPENAI:KEY_STORE,k);
   document.getElementById('setupModal').style.display='none';
 }
 
@@ -550,7 +587,8 @@ async function fetchPageContent(url){
 }
 
 async function doScan(){
-  var apiKey=localStorage.getItem(KEY_STORE);
+  var prov0=localStorage.getItem(KEY_PROVIDER)||'openai';
+  var apiKey=prov0==='openai'?localStorage.getItem(KEY_OPENAI):localStorage.getItem(KEY_STORE);
   if(!apiKey){ showSetup(); return; }
   var raw=document.getElementById('urlIn').value.trim();
   if(!raw){ document.getElementById('urlIn').focus(); return; }
@@ -585,13 +623,15 @@ async function doScan(){
       if(el) el.innerHTML='<div class="dot"></div><span>'+_pMsgs[_pIdx]+'</span>';
     },5000);
 
+    var prov=localStorage.getItem(KEY_PROVIDER)||_activeProv||'openai';
+    var cfg=PROVIDERS[prov]||PROVIDERS.openai;
     var groqCtrl=new AbortController();
     var groqTimer=setTimeout(function(){groqCtrl.abort();},65000);
-    var gr=await fetch(GROQ_URL,{
+    var gr=await fetch(cfg.url,{
       method:'POST',
       headers:{'Authorization':'Bearer '+apiKey,'Content-Type':'application/json'},
       body:JSON.stringify({
-        model:MODEL,
+        model:cfg.model,
         messages:[
           {role:'system',content:'Je bent een CRO-expert voor Nederlandse nieuwbouw projectwebsites. Antwoord altijd in valide JSON, zonder extra tekst.'},
           {role:'user',content:buildPrompt(url,pageContent)}
